@@ -1,0 +1,49 @@
+name: Health check
+
+# End-to-end read-only check against the real VK Ads account.
+#
+# Self-refreshing auth: VK Ads access tokens are short-lived, so instead of storing a
+# static token (which would expire and red-flag the check falsely), we mint a fresh
+# one each run via the client_credentials grant (own account) from client_id/secret.
+# Docs: https://target.vk.ru/help/advertisers/api_authorization
+#
+# smoke makes NO writes (user.json + throttling + ad_plans). Runs daily and on push to
+# main; never on pull_request, so the secrets are not exposed to PRs/forks.
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    if: github.repository == 'gistrec/mcp-vk-ads'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+      - run: npm ci
+      - name: Mint own-account token (client_credentials) + read-only smoke
+        # Secrets are passed via env (never interpolated into the shell) and the minted
+        # token is masked before use — no injection surface, no token in logs/outputs.
+        run: |
+          set -euo pipefail
+          ACCESS_TOKEN=$(curl -sS -X POST "https://ads.vk.com/api/v2/oauth2/token.json" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "grant_type=client_credentials" \
+            --data-urlencode "client_id=$VK_CLIENT_ID" \
+            --data-urlencode "client_secret=$VK_CLIENT_SECRET" \
+            | jq -r '.access_token // empty')
+          if [ -z "$ACCESS_TOKEN" ]; then
+            echo "Failed to obtain a VK Ads access token (client_credentials)."
+            exit 1
+          fi
+          echo "::add-mask::$ACCESS_TOKEN"
+          VK_ADS_TOKEN="$ACCESS_TOKEN" npm run smoke
+        env:
+          VK_CLIENT_ID: ${{ secrets.VK_ADS_CLIENT_ID }}
+          VK_CLIENT_SECRET: ${{ secrets.VK_ADS_CLIENT_SECRET }}
