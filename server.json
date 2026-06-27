@@ -1,0 +1,43 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.askads/mcp-vk-ads",
+  "title": "VK Ads",
+  "description": "MCP server for VK Ads (VK Реклама) API: manage ad plans, ad groups, banners, and statistics.",
+  "websiteUrl": "https://github.com/askads/mcp-vk-ads#readme",
+  "repository": {
+    "url": "https://github.com/askads/mcp-vk-ads",
+    "source": "github"
+  },
+  "version": "1.1.2",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "mcp-vk-ads",
+      "version": "1.1.2",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "VK_ADS_TOKEN",
+          "description": "VK Ads OAuth2 access token (Bearer) — full account access. Treat it as a secret.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "VK_ADS_LANG",
+          "description": "Language for API responses (Accept-Language header), e.g. ru, en.",
+          "isRequired": false,
+          "default": "ru"
+        },
+        {
+          "name": "VK_ADS_API_BASE",
+          "description": "API root without a version segment. Defaults to https://ads.vk.com/api.",
+          "isRequired": false,
+          "default": "https://ads.vk.com/api"
+        }
+      ]
+    }
+  ]
+}
