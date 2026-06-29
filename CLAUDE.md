@@ -54,8 +54,13 @@ More detail in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Tool list: [docs/TOOL
 ## Safety
 
 - Tools hit a **real ad account with real money,** and VK Ads has **no sandbox.** `smoke`
-  is read-only by design; never put a long-lived production token in CI — `health.yml`
-  mints a short-lived own-account token via the `client_credentials` grant.
+  is read-only by design; never put a long-lived production token in CI. `health.yml` runs
+  daily (+ manual dispatch, **never on push**), mints a short-lived own-account token via the
+  `client_credentials` grant, runs the smoke, then **revokes** it (`oauth2/token/delete` by
+  username) so it never accumulates toward VK's 5-active-token-per-user cap. The
+  `VK_ADS_CLIENT_ID/SECRET` secrets must belong to a **dedicated CI-only** account — revoke
+  wipes *all* of that user's tokens. On mint failure the step prints VK's error body
+  (`invalid_client` ⇒ wrong/mis-entered secret, the usual culprit).
 
 ## Releasing
 
