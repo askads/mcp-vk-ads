@@ -59,5 +59,14 @@ More detail in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Tool list: [docs/TOOL
 
 ## Releasing
 
-- Bump `version` in `package.json`, then `npm publish` (runs typecheck + tests). The
-  package is **not** in the MCP registry, so there is no `server.json` / `mcpName` to sync.
+Keep the version in sync across **all** channels in one go — publishing to npm alone silently
+drifts from the rest (`git push --follow-tags` pushes the tag but does **not** create a GitHub
+Release; the registry is immutable per version, so even a metadata-only change needs a bump):
+
+1. Bump `version` in `package.json` **and** `server.json` (root + `packages[].version`)
+   together. `mcpName` in `package.json` must match `name` in `server.json`.
+2. `npm publish` (runs typecheck + tests + build via `prepublishOnly` / `prepare`).
+3. `git commit`, `git tag -a vX.Y.Z -m vX.Y.Z`, `git push origin main --follow-tags`.
+4. **GitHub Release:** `gh release create vX.Y.Z --title vX.Y.Z --generate-notes --verify-tag`.
+5. **Official MCP registry:** `mcp-publisher publish` (this package **is** in the registry as
+   `io.github.askads/mcp-vk-ads`).
