@@ -38,6 +38,42 @@ export function registerAccountTools(server: McpServer, client: VkAdsClient): vo
   );
 
   server.registerTool(
+    "get_balance",
+    {
+      title: "Get account balance",
+      annotations: READ_ONLY,
+      description:
+        "Returns the current VK Ads account balance: available funds and currency. " +
+        "Calls user.json with the `account` field, which carries the wallet " +
+        "(account.balance, account.currency). Reports the balance of the account the " +
+        "token points at (no parameters). " +
+        "Note: the exact balance field name in v3/user.json on the new ads.vk.com " +
+        "platform is not confirmed against a live cabinet (the domain is JS-gated); " +
+        "the schema follows the myTarget/VK Ads object model (v2/v3). This tool returns " +
+        "the RAW VK response unchanged, so a caller can read account.balance defensively " +
+        "regardless of the exact shape — verify on the first live account with read_payments.",
+      // Balance comes from the account the token belongs to — no inputs.
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        // `account` carries the wallet (balance + currency); `currency` is requested at
+        // the top level too since VK may surface the code there rather than under account.
+        // Return the RAW response (no normalization): balance is a Decimal in the account
+        // CURRENCY (major units / rubles — NO micro-units, unlike Yandex Direct) and may
+        // arrive as a string ("1234.56") or number. The askads loader reads
+        // account.balance defensively.
+        const result = await client.get("v3/user.json", {
+          fields: "id,username,account,currency",
+        });
+        return ok(result);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
     "get_throttling",
     {
       title: "Get API rate limits",

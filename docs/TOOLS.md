@@ -9,6 +9,7 @@
 | Инструмент | Что делает |
 | --- | --- |
 | `get_user_info` | Данные кабинета (`user.json`), в т.ч. `additional_info.client_name`. |
+| `get_balance` | Баланс кабинета (`user.json`, поле `account`): доступные средства (`account.balance`) и валюта — в рублях, без микроединиц. |
 | `get_throttling` | Текущие лимиты API и остаток (`throttling.json`). |
 | `get_regions` | Поиск id регионов по подстроке названия (нужны для таргетинга групп). |
 

@@ -7,6 +7,13 @@
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-07-02
+
+### Добавлено
+- Тул `get_balance` (баланс кабинета через `user.json`, `account.balance`, рубли) —
+  read-only, возвращает сырой ответ VK (доступные средства + валюта), без пересчёта в
+  микроединицы.
+
 ## [1.1.4] — 2026-07-02
 
 ### Безопасность
@@ -88,7 +95,9 @@
   и lifecycle-действия (activate/stop/delete), статистика, справочники (регионы),
   `raw_request` (escape hatch на любой эндпойнт), пагинация (offset + авто по offset/count).
 
-[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.1.3...HEAD
+[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/askads/mcp-vk-ads/compare/v1.1.4...v1.2.0
+[1.1.4]: https://github.com/askads/mcp-vk-ads/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/askads/mcp-vk-ads/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/askads/mcp-vk-ads/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/askads/mcp-vk-ads/compare/v1.1.0...v1.1.1
