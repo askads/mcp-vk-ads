@@ -1,9 +1,6 @@
 # VK Ads MCP
 
-[![npm](https://img.shields.io/npm/v/mcp-vk-ads)](https://www.npmjs.com/package/mcp-vk-ads)
-[![CI](https://github.com/askads/mcp-vk-ads/actions/workflows/ci.yml/badge.svg)](https://github.com/askads/mcp-vk-ads/actions/workflows/ci.yml)
-[![Glama](https://glama.ai/mcp/servers/askads/mcp-vk-ads/badges/score.svg)](https://glama.ai/mcp/servers/askads/mcp-vk-ads)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![npm](https://img.shields.io/npm/v/mcp-vk-ads)](https://www.npmjs.com/package/mcp-vk-ads) [![CI](https://github.com/askads/mcp-vk-ads/actions/workflows/ci.yml/badge.svg)](https://github.com/askads/mcp-vk-ads/actions/workflows/ci.yml) [![Glama](https://glama.ai/mcp/servers/askads/mcp-vk-ads/badges/score.svg)](https://glama.ai/mcp/servers/askads/mcp-vk-ads) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 MCP-сервер для **VK Ads (VK Реклама)**: управляйте рекламой из Claude, Cursor, Codex и других AI-клиентов на естественном языке.
 
@@ -51,8 +48,7 @@ MCP-сервер для **VK Ads (VK Реклама)**: управляйте р�
 claude mcp add vk-ads -e VK_ADS_TOKEN=ваш_токен -- npx -y mcp-vk-ads
 ```
 
-Либо через маркетплейс плагинов — токен спросится диалогом при включении и сохранится
-в системном keychain (не в конфиге открытым текстом):
+Либо через маркетплейс плагинов — токен спросится диалогом при включении и сохранится в системном keychain (не в конфиге открытым текстом):
 
 ```
 /plugin marketplace add askads/claude-plugins
@@ -188,10 +184,8 @@ VK_ADS_TOKEN = "ваш_токен"
 
 ## Смотрите также
 
-- **[Ask Ads](https://askads.ru)** — чат-аналитик и «Сторож» рекламных кабинетов от авторов
-  этого сервера: алерты о сливах бюджета и поломках трекинга — в Telegram.
-- **[askads/claude-plugins](https://github.com/askads/claude-plugins)** — маркетплейс плагинов
-  Claude: серверы Ask Ads ставятся одной командой, токены спрашиваются при включении.
+- **[Ask Ads](https://askads.ru)** — чат-аналитик и «Сторож» рекламных кабинетов от авторов этого сервера: алерты о сливах бюджета и поломках трекинга — в Telegram.
+- **[askads/claude-plugins](https://github.com/askads/claude-plugins)** — маркетплейс плагинов Claude: серверы Ask Ads ставятся одной командой, токены спрашиваются при включении.
 
 ## Поддержка
 
