@@ -1,6 +1,6 @@
 {
   "name": "mcp-vk-ads",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "MCP server for the VK Ads (VK Реклама) API — manage ad plans, ad groups, banners and pull statistics from AI agents.",
   "mcpName": "io.github.askads/mcp-vk-ads",
   "type": "module",
@@ -8,7 +8,8 @@
     "mcp-vk-ads": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "test"
   ],
   "engines": {
     "node": ">=20"
@@ -19,7 +20,9 @@
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc -p tsconfig.check.json",
     "smoke": "node --import tsx src/smoke.ts",
-    "test": "node --import tsx --test $(find src -name '*.test.ts')",
+    "test": "npm run test:src && npm run test:dist",
+    "test:src": "node --import tsx --test $(find src -name '*.test.ts')",
+    "test:dist": "npm run build && node --test test/dist-smoke.test.js",
     "prepare": "npm run build",
     "prepublishOnly": "npm run typecheck && npm test"
   },
