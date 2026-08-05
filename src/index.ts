@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { VkAdsClient } from "./client.js";
 import { loadConfig } from "./config.js";
+import { instrumentToolCalls, Telemetry } from "./telemetry.js";
 
 /** Reads the package version so the server reports its real version to MCP clients. */
 function readVersion(): string {
@@ -29,6 +30,15 @@ async function main(): Promise<void> {
     name: "mcp-vk-ads",
     version: readVersion(),
   });
+
+  // Anonymous usage pings (ids/names/versions only, never data or arguments);
+  // opt out with ASKADS_TELEMETRY=0. Must be wired before tools register.
+  const telemetry = new Telemetry(readVersion());
+  instrumentToolCalls(server, telemetry);
+  server.server.oninitialized = () => {
+    telemetry.setClientInfo(server.server.getClientVersion());
+    telemetry.send("server_start");
+  };
 
   registerAccountTools(server, client);
   registerAdPlanTools(server, client);
