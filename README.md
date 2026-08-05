@@ -16,7 +16,7 @@ MCP-сервер для **VK Ads (VK Реклама)**: управляйте р�
 2. Добавьте сервер — например, в Claude Code ([другие клиенты](#установка)):
 
    ```bash
-   claude mcp add vk-ads -e VK_ADS_TOKEN=ваш_токен -- npx -y mcp-vk-ads
+   claude mcp add vk-ads -e VK_ADS_TOKEN=ваш_токен -- npx -y mcp-vk-ads@latest
    ```
 
 3. Спросите ассистента: «Покажи статистику по кампаниям за последние 7 дней».
@@ -49,7 +49,7 @@ MCP-сервер для **VK Ads (VK Реклама)**: управляйте р�
 <summary><b>Claude Code</b></summary>
 
 ```bash
-claude mcp add vk-ads -e VK_ADS_TOKEN=ваш_токен -- npx -y mcp-vk-ads
+claude mcp add vk-ads -e VK_ADS_TOKEN=ваш_токен -- npx -y mcp-vk-ads@latest
 ```
 
 Либо через маркетплейс плагинов — токен спросится диалогом при включении и сохранится в системном keychain (не в конфиге открытым текстом):
@@ -102,7 +102,7 @@ claude mcp add vk-ads -e VK_ADS_TOKEN=ваш_токен -- npx -y mcp-vk-ads
 <details>
 <summary><b>OpenAI Codex</b></summary>
 
-Командой: `codex mcp add vk-ads --env VK_ADS_TOKEN=ваш_токен -- npx -y mcp-vk-ads`
+Командой: `codex mcp add vk-ads --env VK_ADS_TOKEN=ваш_токен -- npx -y mcp-vk-ads@latest`
 
 Или в `~/.codex/config.toml`:
 
