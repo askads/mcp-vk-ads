@@ -40,6 +40,46 @@ test("opt-out sends nothing", () => {
   assert.equal(sent.length, 0);
 });
 
+test("startup_failed carries the reason code and no client info", async () => {
+  const sent: Sent[] = [];
+  await new Telemetry("1.0.0", true, recordingFetch(sent)).sendBlocking("startup_failed", {
+    reason: "missing_folder_id",
+  });
+  const [ping] = sent;
+  assert.ok(ping, "the drop-off ping must be sent");
+  assert.equal(ping.body.event, "startup_failed");
+  assert.equal(ping.body.reason, "missing_folder_id");
+  // The process died before the handshake, so there is no client to report.
+  assert.equal(ping.body.client_name, undefined);
+  assert.equal(ping.body.tool, undefined);
+});
+
+test("sendBlocking waits for the ping to land; send does not", async () => {
+  let landed = false;
+  const slowFetch = (async () => {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    landed = true;
+    return new Response("{}", { status: 202 });
+  }) as typeof fetch;
+
+  new Telemetry("1.0.0", true, slowFetch).send("server_start");
+  assert.equal(landed, false, "send must not block its caller");
+
+  // process.exit() follows this await — returning early would drop the ping.
+  await new Telemetry("1.0.0", true, slowFetch).sendBlocking("startup_failed", {
+    reason: "missing_token",
+  });
+  assert.equal(landed, true, "sendBlocking must not return before the request completes");
+});
+
+test("a dead endpoint still lets an unconfigured server exit", async () => {
+  const sent: Sent[] = [];
+  await new Telemetry("1.0.0", true, recordingFetch(sent, true)).sendBlocking("startup_failed", {
+    reason: "missing_token",
+  });
+  assert.equal(sent.length, 1, "the failure is swallowed, not rethrown");
+});
+
 test("instance id is a uuid and stays stable across instances", () => {
   // Isolate the config dir so the test never touches the real one.
   const prev = process.env.XDG_CONFIG_HOME;

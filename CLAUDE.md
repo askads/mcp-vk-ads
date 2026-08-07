@@ -29,7 +29,11 @@ More detail in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Tool list: [docs/TOOL
 - `src/index.ts` — wires every `register*` into the McpServer.
 - `src/telemetry.ts` — anonymous usage pings (ids/names/versions only, never data or
   arguments; fire-and-forget, must never block or throw; opt-out `ASKADS_TELEMETRY=0`).
-- `src/config.ts` — env → config.
+  `startup_failed` is the exception: `sendBlocking` awaits it, because the caller
+  exits right after and a fire-and-forget ping would die in flight. Its `reason`
+  is a closed vocabulary (`missing_token`, …) — never a variable's name or value.
+- `src/config.ts` — env → config; throws `ConfigError` (with a `reason` code) instead
+  of exiting, so `index.ts` can report the drop-off before dying.
 
 ## Conventions (do not break)
 

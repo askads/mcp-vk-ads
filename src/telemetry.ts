@@ -2,10 +2,11 @@
  * Anonymous usage telemetry — fire-and-forget pings to usage.gistrec.cloud.
  *
  * Privacy contract (mirrored by the receiver): only an anonymous random
- * instance id, event/tool names and environment versions ever leave the
- * machine. The API token, account data, tool arguments and prompts are never
- * read, serialized or sent. Sends are non-blocking, capped at 2 s and
- * swallow every error — telemetry must never affect the server's operation.
+ * instance id, event/tool names, a fixed-vocabulary failure reason and
+ * environment versions ever leave the machine. The API token, account data,
+ * tool arguments, prompts and the names or values of environment variables are
+ * never read, serialized or sent. Sends are capped at 2 s and swallow every
+ * error — telemetry must never affect the server's operation.
  * Opt out for every Ask Ads MCP server at once: ASKADS_TELEMETRY=0
  * (also accepts false/off/no).
  */
@@ -54,6 +55,19 @@ export interface ClientInfo {
   version?: string;
 }
 
+/**
+ * `server_start` fires after the MCP handshake, `tool_call` per invocation and
+ * `startup_failed` when the process dies on missing credentials — the only
+ * signal that someone installed the server but never got a key in.
+ */
+export type TelemetryEvent = "server_start" | "tool_call" | "startup_failed";
+
+/** `tool` rides with tool_call, `reason` with startup_failed. */
+export interface EventFields {
+  tool?: string;
+  reason?: string;
+}
+
 export class Telemetry {
   private readonly instanceId: string;
   private clientInfo: ClientInfo | undefined;
@@ -71,7 +85,21 @@ export class Telemetry {
     this.clientInfo = info;
   }
 
-  send(event: "server_start" | "tool_call", fields: { tool?: string } = {}): void {
+  /** Fire-and-forget: the server's own work never waits on a ping. */
+  send(event: TelemetryEvent, fields: EventFields = {}): void {
+    void this.post(event, fields);
+  }
+
+  /**
+   * The same ping, awaited. Only for the startup_failed path: that caller
+   * calls process.exit() immediately after, which would kill an in-flight
+   * fire-and-forget request before it ever left the machine.
+   */
+  async sendBlocking(event: TelemetryEvent, fields: EventFields = {}): Promise<void> {
+    await this.post(event, fields);
+  }
+
+  private async post(event: TelemetryEvent, fields: EventFields): Promise<void> {
     if (!this.enabled) return;
     const body = JSON.stringify({
       app: APP,
@@ -81,18 +109,19 @@ export class Telemetry {
       client_name: this.clientInfo?.name,
       client_version: this.clientInfo?.version,
       tool: fields.tool,
+      reason: fields.reason,
       node_version: process.version,
       os: process.platform,
     });
     try {
-      void this.fetchImpl(ENDPOINT, {
+      await this.fetchImpl(ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body,
         signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
-      }).catch(() => {});
+      });
     } catch {
-      // even a synchronous fetch failure must not surface
+      // network failure, timeout abort or a synchronous throw — all silent
     }
   }
 }
