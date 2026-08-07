@@ -7,6 +7,23 @@
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-08-07
+
+### Добавлено
+- Событие телеметрии `startup_failed`: сервер, умирающий из-за отсутствующих
+  credentials, сообщает об этом до выхода — с машинным кодом причины
+  (`missing_token`). Раньше такие установки не попадали в телеметрию
+  вовсе:
+  процесс завершался раньше MCP-хендшейка, и «не смог настроить» было
+  неотличимо от «поставил и не пользуется». Отправляется только код —
+  ни имя, ни значение переменной окружения; отключение прежнее:
+  `ASKADS_TELEMETRY=0`.
+
+### Изменено
+- Конфигурация бросает `ConfigError` вместо немедленного `process.exit`, чтобы
+  точка входа успела отправить пинг. Сообщение об ошибке и код возврата для
+  пользователя не изменились; ожидание отправки ограничено прежними 2 с.
+
 ## [1.3.0] — 2026-08-05
 
 ### Добавлено
@@ -110,7 +127,9 @@
   и lifecycle-действия (activate/stop/delete), статистика, справочники (регионы),
   `raw_request` (escape hatch на любой эндпойнт), пагинация (offset + авто по offset/count).
 
-[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/askads/mcp-vk-ads/releases/tag/v1.4.0
+[1.3.0]: https://github.com/askads/mcp-vk-ads/releases/tag/v1.3.0
 [1.2.0]: https://github.com/askads/mcp-vk-ads/compare/v1.1.4...v1.2.0
 [1.1.4]: https://github.com/askads/mcp-vk-ads/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/askads/mcp-vk-ads/compare/v1.1.2...v1.1.3
