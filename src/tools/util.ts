@@ -10,7 +10,7 @@ import type { VkAdsClient } from "../client.js";
  * generated JSON schema, which some MCP clients don't dereference. Call `isoDate()`.
  */
 export const isoDate = () =>
-  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be a date in YYYY-MM-DD format");
+  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Дата должна быть в формате YYYY-MM-DD");
 
 export function ok(data: unknown): CallToolResult {
   // Compact JSON (no pretty-print) to save tokens; `?? "null"` guards against
@@ -21,7 +21,7 @@ export function ok(data: unknown): CallToolResult {
 
 export function fail(err: unknown): CallToolResult {
   const message = err instanceof Error ? err.message : String(err);
-  return { content: [{ type: "text", text: `Error: ${message}` }], isError: true };
+  return { content: [{ type: "text", text: `Ошибка: ${message}` }], isError: true };
 }
 
 /** Drops keys whose value is `undefined` so they are not sent to the API. */
@@ -110,7 +110,7 @@ export async function setStatusForIds(
   const body = JSON.stringify(results);
   if (failed === 0) return ok(body);
   return {
-    content: [{ type: "text", text: `${failed} of ${ids.length} object(s) failed:\n${body}` }],
+    content: [{ type: "text", text: `Не удалось изменить статус (${failed} из ${ids.length}):\n${body}` }],
     isError: true,
   };
 }

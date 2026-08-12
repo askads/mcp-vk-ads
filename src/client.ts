@@ -74,7 +74,7 @@ export class VkAdsClient {
       return { res, text };
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
-        throw new Error(`Request to "${label}" timed out after ${this.timeoutMs}ms`);
+        throw new Error(`Запрос к "${label}" превысил таймаут ${this.timeoutMs} мс`);
       }
       throw err;
     } finally {
@@ -89,7 +89,7 @@ export class VkAdsClient {
     // a foreign host. Refuse anything that resolves off the API origin.
     if (url.origin !== new URL(this.base).origin) {
       throw new Error(
-        `raw_request path must be a relative API path (resolved to foreign origin ${url.origin})`,
+        `Путь в raw_request должен быть относительным путём API (ведёт на чужой origin ${url.origin})`,
       );
     }
     if (query) {
@@ -223,8 +223,8 @@ export class VkAdsClient {
     if (truncated) {
       result._truncated = true;
       result._truncatedNote =
-        `Truncated: returned the first ${items.length} of ${count} objects ` +
-        `(page/response-size cap). Filter by ids or narrow the period to get the rest.`;
+        `Усечено: возвращены первые ${items.length} объектов из ${count} ` +
+        `(лимит страниц и размера ответа). Остальные — с фильтром по ids или более узким периодом.`;
     }
     return result;
   }

@@ -23,7 +23,7 @@ test("dist client rejects foreign-origin paths before sending the bearer token",
     maxRetries: 0,
   });
 
-  await assert.rejects(() => client.get("https://example.invalid/steal"), /foreign origin/);
+  await assert.rejects(() => client.get("https://example.invalid/steal"), /чужой origin/);
   assert.equal(called, false);
 });
 

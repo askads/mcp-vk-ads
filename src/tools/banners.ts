@@ -24,24 +24,24 @@ export function registerBannerTools(server: McpServer, client: VkAdsClient): voi
   server.registerTool(
     "list_banners",
     {
-      title: "List banners (ads)",
+      title: "Список объявлений (banners)",
       annotations: READ_ONLY,
       description:
-        "Lists banners (the VK Ads creative/ad object) with optional filtering by id, parent ad group and status. moderation_status (pending/allowed/banned) and delivery show why an ad is or isn't showing.",
+        "Возвращает список banner (объект объявления/креатива в VK Рекламе) с необязательной фильтрацией по id, родительской группе объявлений и статусу. moderation_status (pending/allowed/banned) и delivery объясняют, почему объявление показывается или не показывается.",
       inputSchema: {
-        ids: z.array(z.number().int()).optional().describe("Filter by banner ids."),
-        adGroupIds: z.array(z.number().int()).optional().describe("Filter by parent ad group ids."),
+        ids: z.array(z.number().int()).optional().describe("Фильтр по id объявлений."),
+        adGroupIds: z.array(z.number().int()).optional().describe("Фильтр по id родительских групп объявлений."),
         statuses: z
           .array(z.enum(["active", "blocked", "deleted"]))
           .optional()
-          .describe("Filter by status."),
-        fields: z.array(z.string()).optional().describe("Banner fields to return."),
-        limit: z.number().int().min(1).max(250).optional().describe("Max objects per page (<=250)."),
-        offset: z.number().int().min(0).optional().describe("Pagination offset (objects to skip)."),
+          .describe("Фильтр по статусу."),
+        fields: z.array(z.string()).optional().describe("Поля объявления в ответе."),
+        limit: z.number().int().min(1).max(250).optional().describe("Сколько объектов на страницу (не больше 250)."),
+        offset: z.number().int().min(0).optional().describe("Смещение постраничной выдачи (сколько объектов пропустить)."),
         autoPaginate: z
           .boolean()
           .optional()
-          .describe("Fetch all pages by following offset/count (ignores limit as a total cap)."),
+          .describe("Забрать все страницы, идя по offset/count (limit при этом не ограничивает общее число объектов)."),
       },
     },
     async ({ ids, adGroupIds, statuses, fields, limit, offset, autoPaginate }) => {
@@ -67,20 +67,20 @@ export function registerBannerTools(server: McpServer, client: VkAdsClient): voi
   server.registerTool(
     "create_banner",
     {
-      title: "Create banner (ad)",
+      title: "Создать объявление (banner)",
       annotations: WRITE_CREATE,
       description:
-        "Creates a banner inside an ad group. Creative content references uploaded media via `content`, ad copy goes in `textblocks` and links in `urls`. These structures are sent verbatim; consult the VK Ads docs for the exact shape per ad format.",
+        "Создаёт объявление внутри группы объявлений. Креатив ссылается на загруженные медиа через `content`, тексты объявления — в `textblocks`, ссылки — в `urls`. Эти структуры отправляются как есть; точная форма для каждого формата объявления — в документации VK Рекламы.",
       inputSchema: {
-        adGroupId: z.number().int().describe("Parent ad group id."),
-        name: z.string().min(1).optional().describe("Banner name."),
+        adGroupId: z.number().int().describe("Id родительской группы объявлений."),
+        name: z.string().min(1).optional().describe("Название объявления."),
         textblocks: z
           .record(z.any())
           .optional()
-          .describe("Text blocks, e.g. {\"title\":{\"text\":\"...\"},\"text\":{\"text\":\"...\"}}."),
-        urls: z.record(z.any()).optional().describe("Link objects, e.g. {\"primary\":{\"url\":\"https://...\"}}."),
-        content: z.record(z.any()).optional().describe("Creative content references (uploaded media ids)."),
-        extra: z.record(z.any()).optional().describe("Extra banner fields merged into the body verbatim."),
+          .describe("Текстовые блоки, например {\"title\":{\"text\":\"...\"},\"text\":{\"text\":\"...\"}}."),
+        urls: z.record(z.any()).optional().describe("Объекты ссылок, например {\"primary\":{\"url\":\"https://...\"}}."),
+        content: z.record(z.any()).optional().describe("Ссылки на содержимое креатива (id загруженных медиа)."),
+        extra: z.record(z.any()).optional().describe("Дополнительные поля объявления, подмешиваемые в тело запроса как есть."),
       },
     },
     async ({ adGroupId, name, textblocks, urls, content, extra }) => {
@@ -104,23 +104,23 @@ export function registerBannerTools(server: McpServer, client: VkAdsClient): voi
   server.registerTool(
     "update_banner",
     {
-      title: "Update banner (ad)",
+      title: "Изменить объявление (banner)",
       annotations: WRITE_UPDATE,
       description:
-        "Updates a banner's name, text blocks or links. Use banner_action to change status. Structures are sent verbatim.",
+        "Меняет у объявления название, текстовые блоки или ссылки. Для смены статуса — banner_action. Структуры отправляются как есть.",
       inputSchema: {
-        id: z.number().int().describe("Banner id to update."),
-        name: z.string().min(1).optional().describe("New name."),
-        textblocks: z.record(z.any()).optional().describe("Replacement text blocks, sent verbatim."),
-        urls: z.record(z.any()).optional().describe("Replacement link objects, sent verbatim."),
-        extra: z.record(z.any()).optional().describe("Extra fields merged into the body verbatim."),
+        id: z.number().int().describe("Id изменяемого объявления."),
+        name: z.string().min(1).optional().describe("Новое название."),
+        textblocks: z.record(z.any()).optional().describe("Новые текстовые блоки взамен прежних, отправляются как есть."),
+        urls: z.record(z.any()).optional().describe("Новые объекты ссылок взамен прежних, отправляются как есть."),
+        extra: z.record(z.any()).optional().describe("Дополнительные поля, подмешиваемые в тело запроса как есть."),
       },
     },
     async ({ id, name, textblocks, urls, extra }) => {
       try {
         const body = compact({ name, textblocks, urls, ...extra });
         if (Object.keys(body).length === 0) {
-          return fail("Provide at least one field to update.");
+          return fail("Нужно передать хотя бы одно поле для изменения.");
         }
         const result = await client.post(`v2/banners/${id}.json`, body);
         return ok(result);
@@ -133,13 +133,13 @@ export function registerBannerTools(server: McpServer, client: VkAdsClient): voi
   server.registerTool(
     "banner_action",
     {
-      title: "Banner action",
+      title: "Действие над объявлением",
       annotations: WRITE_DELETE,
       description:
-        "Changes the lifecycle status of banners by id: activate (status=active), stop (status=blocked) or delete (status=deleted).",
+        "Меняет статус объявлений по id: activate (status=active), stop (status=blocked) или delete (status=deleted).",
       inputSchema: {
         action: z.enum(["activate", "stop", "delete"]),
-        ids: z.array(z.number().int()).min(1).describe("Banner ids to act on."),
+        ids: z.array(z.number().int()).min(1).describe("Id объявлений, к которым применить действие."),
       },
     },
     async ({ action, ids }) => {

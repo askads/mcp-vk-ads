@@ -19,7 +19,7 @@ export class ConfigError extends Error {
 export function loadConfig(): VkAdsConfig {
   const token = process.env.VK_ADS_TOKEN;
   if (!token) {
-    throw new ConfigError("VK_ADS_TOKEN environment variable is required.", "missing_token");
+    throw new ConfigError("Требуется переменная окружения VK_ADS_TOKEN.", "missing_token");
   }
   const timeoutMs = Number(process.env.VK_ADS_TIMEOUT_MS);
   const maxRetries = Number(process.env.VK_ADS_MAX_RETRIES);

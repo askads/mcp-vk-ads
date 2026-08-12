@@ -10,34 +10,34 @@ export function registerStatisticsTools(server: McpServer, client: VkAdsClient):
   server.registerTool(
     "get_statistics",
     {
-      title: "Get statistics",
+      title: "Статистика",
       annotations: READ_ONLY,
       description:
-        "Fetches performance statistics from the VK Ads v3 statistics service for ad plans, ad groups or banners. By default the grouping is `summary` — one aggregated row per object over the whole period; use day/week/month ONLY for daily dynamics or trend questions (each adds a row per object per period). Rank objects server-side with sortBy (e.g. base.spent) + order; the response also carries `total` — the summary across ALL objects for the period (use it for «сколько всего», no need to sum rows). Metrics live under `base` (shows, clicks, spent, ...); spent is in account currency.",
+        "Возвращает статистику по кампаниям (ad_plans), группам объявлений (ad_groups) или объявлениям (banners) из сервиса статистики VK Рекламы v3. По умолчанию группировка `summary` — одна сводная строка на объект за весь период; day/week/month нужны ТОЛЬКО для динамики по дням и вопросов про тренд (каждая добавляет по строке на объект за период). Ранжирование на стороне сервера — через sortBy (например, base.spent) и order; в ответе есть также `total` — сводка по ВСЕМ объектам за период (для вопросов «сколько всего» суммировать строки не нужно). Метрики лежат в `base` (shows, clicks, spent, ...); spent — в валюте аккаунта.",
       inputSchema: {
-        entity: z.enum(ENTITIES).optional().describe("Object type to report on. Default banners."),
+        entity: z.enum(ENTITIES).optional().describe("Тип объектов для отчёта. По умолчанию banners."),
         period: z
           .enum(PERIODS)
           .optional()
-          .describe("Grouping: summary (whole range, default), or day/week/month for trends."),
+          .describe("Группировка: summary (весь период, по умолчанию) либо day/week/month для динамики."),
         ids: z
           .array(z.number().int())
           .optional()
-          .describe("Limit the report to these object ids (of the chosen entity)."),
-        dateFrom: isoDate().optional().describe("Start date YYYY-MM-DD (required for day/week/month)."),
-        dateTo: isoDate().optional().describe("End date YYYY-MM-DD (required for day/week/month)."),
+          .describe("Ограничить отчёт этими id объектов (выбранного entity)."),
+        dateFrom: isoDate().optional().describe("Дата начала, YYYY-MM-DD (обязательна для day/week/month)."),
+        dateTo: isoDate().optional().describe("Дата окончания, YYYY-MM-DD (обязательна для day/week/month)."),
         metrics: z
           .array(z.string())
           .optional()
-          .describe("Metric groups to include, e.g. base, events, video. Defaults to the API default."),
+          .describe("Группы метрик в отчёте, например base, events, video. По умолчанию — набор API."),
         sortBy: z
           .string()
           .optional()
-          .describe("Server-side sort field, e.g. base.spent / base.clicks / base.shows (top-N by metric)."),
-        order: z.enum(["asc", "desc"]).optional().describe("Sort direction for sortBy. Default desc."),
-        limit: z.number().int().min(1).max(250).optional().describe("Max objects per page (<=250)."),
-        offset: z.number().int().min(0).optional().describe("Pagination offset (objects to skip)."),
-        autoPaginate: z.boolean().optional().describe("Fetch all pages by following offset/count."),
+          .describe("Поле сортировки на стороне сервера, например base.spent / base.clicks / base.shows (топ-N по метрике)."),
+        order: z.enum(["asc", "desc"]).optional().describe("Направление сортировки для sortBy. По умолчанию desc."),
+        limit: z.number().int().min(1).max(250).optional().describe("Сколько объектов на страницу (не больше 250)."),
+        offset: z.number().int().min(0).optional().describe("Смещение постраничной выдачи (сколько объектов пропустить)."),
+        autoPaginate: z.boolean().optional().describe("Забрать все страницы, идя по offset/count."),
       },
     },
     async ({ entity, period, ids, dateFrom, dateTo, metrics, sortBy, order, limit, offset, autoPaginate }) => {
@@ -45,7 +45,7 @@ export function registerStatisticsTools(server: McpServer, client: VkAdsClient):
         const ent = entity ?? "banners";
         const grp = period ?? "summary";
         if (grp !== "summary" && (!dateFrom || !dateTo)) {
-          return fail(`The "${grp}" grouping requires both dateFrom and dateTo (YYYY-MM-DD).`);
+          return fail(`Для группировки "${grp}" нужны и dateFrom, и dateTo (YYYY-MM-DD).`);
         }
         const path = `v3/statistics/${ent}/${grp}.json`;
         const query = compact({
@@ -64,8 +64,8 @@ export function registerStatisticsTools(server: McpServer, client: VkAdsClient):
         const items = (result as { items?: unknown[] } | undefined)?.items;
         if (ids?.length && Array.isArray(items) && items.length === 0) {
           return fail(
-            `Statistics returned 0 objects for ids [${ids.join(", ")}] (entity ${ent}, grouping ${grp}). ` +
-              "Check the ids and the date range — do not broaden the filter blindly.",
+            `Статистика вернула 0 объектов по ids [${ids.join(", ")}] (entity ${ent}, группировка ${grp}). ` +
+              "Проверить id и диапазон дат — снимать фильтр вслепую не нужно.",
           );
         }
         return ok(result);

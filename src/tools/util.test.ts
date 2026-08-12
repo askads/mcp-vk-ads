@@ -40,7 +40,7 @@ test("ok emits the string \"null\" when JSON.stringify yields undefined", () => 
 test("fail marks the result as an error and keeps the message", () => {
   const result = fail(new Error("boom"));
   assert.equal(result.isError, true);
-  assert.match(text(result), /Error: boom/);
+  assert.match(text(result), /Ошибка: boom/);
 });
 
 test("setStatusForIds posts the status per id and reports success", async () => {
@@ -72,5 +72,5 @@ test("setStatusForIds flags partial failures as an error", async () => {
   const result = await setStatusForIds(client, "banners", [1, 2, 3], "deleted");
 
   assert.equal(result.isError, true);
-  assert.match(text(result), /1 of 3 object\(s\) failed/);
+  assert.match(text(result), /Не удалось изменить статус \(1 из 3\)/);
 });

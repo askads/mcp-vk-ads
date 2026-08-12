@@ -13,26 +13,26 @@ export function registerRawTool(server: McpServer, client: VkAdsClient): void {
   server.registerTool(
     "raw_request",
     {
-      title: "Raw VK Ads API call",
+      title: "Произвольный запрос к API VK Рекламы",
       // Escape hatch: can POST/DELETE, so flag it destructive.
       annotations: WRITE_DELETE,
       description:
-        'Escape hatch to call any VK Ads API endpoint directly (e.g. path "v2/ad_plans.json", method GET). Use this for endpoints that have no dedicated tool. `query` becomes the query string; `body` is sent as JSON for POST. GET runs freely; POST and DELETE are writes and require confirmWrite=true.',
+        'Универсальный запрос напрямую к любому эндпоинту API VK Рекламы (например, path "v2/ad_plans.json", method GET). Нужен для эндпоинтов, у которых нет отдельного инструмента. `query` уходит в строку запроса, `body` отправляется как JSON для POST. GET выполняется свободно; POST и DELETE — запись, для них нужен confirmWrite=true.',
       inputSchema: {
         path: z
           .string()
           .min(1)
-          .describe('Versioned endpoint path, e.g. "v2/ad_plans.json", "v3/statistics/banners/day.json".'),
-        method: z.enum(["GET", "POST", "DELETE"]).optional().describe("HTTP method. Default GET."),
+          .describe('Путь эндпоинта с версией, например "v2/ad_plans.json", "v3/statistics/banners/day.json".'),
+        method: z.enum(["GET", "POST", "DELETE"]).optional().describe("HTTP-метод. По умолчанию GET."),
         query: z
           .record(z.union([z.string(), z.number(), z.boolean()]))
           .optional()
-          .describe("Query string parameters (filters, fields, pagination)."),
-        body: z.record(z.any()).optional().describe("JSON body for POST requests."),
+          .describe("Параметры строки запроса (фильтры, поля, постраничная выдача)."),
+        body: z.record(z.any()).optional().describe("JSON-тело для POST-запросов."),
         confirmWrite: z
           .boolean()
           .optional()
-          .describe("Must be true for a write (POST or DELETE)."),
+          .describe("Должен быть true для записи (POST или DELETE)."),
       },
     },
     async ({ path, method, query, body, confirmWrite }) => {
@@ -40,7 +40,7 @@ export function registerRawTool(server: McpServer, client: VkAdsClient): void {
         const m = (method ?? "GET") as HttpMethod;
         if (!isReadMethod(m) && confirmWrite !== true) {
           return fail(
-            `"${m} ${path}" is a write operation. Re-run with confirmWrite=true to proceed.`,
+            `"${m} ${path}" — операция записи. Повторить вызов с confirmWrite=true, чтобы выполнить её.`,
           );
         }
         const result = await client.request(m, path, { query, body });

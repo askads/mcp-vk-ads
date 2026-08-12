@@ -26,27 +26,27 @@ export function registerAdGroupTools(server: McpServer, client: VkAdsClient): vo
   server.registerTool(
     "list_ad_groups",
     {
-      title: "List ad groups",
+      title: "Список групп объявлений",
       annotations: READ_ONLY,
       description:
-        "Lists ad groups with optional filtering by id, parent ad plan and status. Money fields are in the account currency; `targetings` holds the geo/demographic/interest targeting structure.",
+        "Возвращает список групп объявлений с необязательной фильтрацией по id, родительской кампании и статусу. Денежные поля — в валюте аккаунта; в `targetings` лежит структура таргетинга по гео, демографии и интересам.",
       inputSchema: {
-        ids: z.array(z.number().int()).optional().describe("Filter by ad group ids."),
-        adPlanIds: z.array(z.number().int()).optional().describe("Filter by parent ad plan ids."),
+        ids: z.array(z.number().int()).optional().describe("Фильтр по id групп объявлений."),
+        adPlanIds: z.array(z.number().int()).optional().describe("Фильтр по id родительских кампаний."),
         statuses: z
           .array(z.enum(["active", "blocked", "deleted"]))
           .optional()
-          .describe("Filter by status."),
+          .describe("Фильтр по статусу."),
         fields: z
           .array(z.string())
           .optional()
-          .describe("Ad group fields to return (add \"targetings\" for the full targeting object)."),
-        limit: z.number().int().min(1).max(250).optional().describe("Max objects per page (<=250)."),
-        offset: z.number().int().min(0).optional().describe("Pagination offset (objects to skip)."),
+          .describe("Поля группы объявлений в ответе (с «targetings» вернётся полный объект таргетинга)."),
+        limit: z.number().int().min(1).max(250).optional().describe("Сколько объектов на страницу (не больше 250)."),
+        offset: z.number().int().min(0).optional().describe("Смещение постраничной выдачи (сколько объектов пропустить)."),
         autoPaginate: z
           .boolean()
           .optional()
-          .describe("Fetch all pages by following offset/count (ignores limit as a total cap)."),
+          .describe("Забрать все страницы, идя по offset/count (limit при этом не ограничивает общее число объектов)."),
       },
     },
     async ({ ids, adPlanIds, statuses, fields, limit, offset, autoPaginate }) => {
@@ -72,26 +72,26 @@ export function registerAdGroupTools(server: McpServer, client: VkAdsClient): vo
   server.registerTool(
     "create_ad_group",
     {
-      title: "Create ad group",
+      title: "Создать группу объявлений",
       annotations: WRITE_CREATE,
       description:
-        "Creates an ad group inside an ad plan. Targeting goes in `targetings` (e.g. {\"geo\":{\"regions\":[188]},\"age\":{\"age_list\":[25,26]}}). Money fields are in account currency. Use `extra` for any other field.",
+        "Создаёт группу объявлений внутри кампании. Таргетинг задаётся в `targetings` (например, {\"geo\":{\"regions\":[188]},\"age\":{\"age_list\":[25,26]}}). Денежные поля — в валюте аккаунта. Остальные поля — через `extra`.",
       inputSchema: {
-        adPlanId: z.number().int().describe("Parent ad plan id."),
-        name: z.string().min(1).describe("Ad group name."),
+        adPlanId: z.number().int().describe("Id родительской кампании."),
+        name: z.string().min(1).describe("Название группы объявлений."),
         objective: z
           .string()
           .optional()
-          .describe("Group objective, e.g. site_conversions, leadads, traffic."),
-        autobiddingMode: z.string().optional().describe("Auction strategy, e.g. max_goals."),
-        budgetLimit: z.number().positive().optional().describe("Total budget in account currency."),
-        budgetLimitDay: z.number().positive().optional().describe("Daily budget in account currency."),
-        maxPrice: z.number().positive().optional().describe("Bid cap in account currency."),
-        price: z.number().positive().optional().describe("Price per optimized event, in account currency."),
-        dateStart: isoDate().optional().describe("Start date YYYY-MM-DD."),
-        dateEnd: isoDate().optional().describe("End date YYYY-MM-DD."),
-        targetings: z.record(z.any()).optional().describe("Targeting structure, sent verbatim."),
-        extra: z.record(z.any()).optional().describe("Extra fields merged into the body verbatim."),
+          .describe("Цель группы, например site_conversions, leadads, traffic."),
+        autobiddingMode: z.string().optional().describe("Стратегия аукциона, например max_goals."),
+        budgetLimit: z.number().positive().optional().describe("Общий бюджет в валюте аккаунта."),
+        budgetLimitDay: z.number().positive().optional().describe("Дневной бюджет в валюте аккаунта."),
+        maxPrice: z.number().positive().optional().describe("Предельная ставка в валюте аккаунта."),
+        price: z.number().positive().optional().describe("Цена оптимизируемого события в валюте аккаунта."),
+        dateStart: isoDate().optional().describe("Дата начала, YYYY-MM-DD."),
+        dateEnd: isoDate().optional().describe("Дата окончания, YYYY-MM-DD."),
+        targetings: z.record(z.any()).optional().describe("Структура таргетинга, отправляется как есть."),
+        extra: z.record(z.any()).optional().describe("Дополнительные поля, подмешиваемые в тело запроса как есть."),
       },
     },
     async (args) => {
@@ -121,19 +121,19 @@ export function registerAdGroupTools(server: McpServer, client: VkAdsClient): vo
   server.registerTool(
     "update_ad_group",
     {
-      title: "Update ad group",
+      title: "Изменить группу объявлений",
       annotations: WRITE_UPDATE,
       description:
-        "Updates an ad group's name, budgets, bid cap, dates or targeting. Money fields are in account currency. Use ad_group_action to change status.",
+        "Меняет у группы объявлений название, бюджеты, предельную ставку, даты или таргетинг. Денежные поля — в валюте аккаунта. Для смены статуса — ad_group_action.",
       inputSchema: {
-        id: z.number().int().describe("Ad group id to update."),
-        name: z.string().min(1).optional().describe("New name."),
-        budgetLimit: z.number().positive().optional().describe("Total budget in account currency."),
-        budgetLimitDay: z.number().positive().optional().describe("Daily budget in account currency."),
-        maxPrice: z.number().positive().optional().describe("Bid cap in account currency."),
-        dateEnd: isoDate().optional().describe("New end date YYYY-MM-DD."),
-        targetings: z.record(z.any()).optional().describe("Replacement targeting structure, sent verbatim."),
-        extra: z.record(z.any()).optional().describe("Extra fields merged into the body verbatim."),
+        id: z.number().int().describe("Id изменяемой группы объявлений."),
+        name: z.string().min(1).optional().describe("Новое название."),
+        budgetLimit: z.number().positive().optional().describe("Общий бюджет в валюте аккаунта."),
+        budgetLimitDay: z.number().positive().optional().describe("Дневной бюджет в валюте аккаунта."),
+        maxPrice: z.number().positive().optional().describe("Предельная ставка в валюте аккаунта."),
+        dateEnd: isoDate().optional().describe("Новая дата окончания, YYYY-MM-DD."),
+        targetings: z.record(z.any()).optional().describe("Новая структура таргетинга взамен прежней, отправляется как есть."),
+        extra: z.record(z.any()).optional().describe("Дополнительные поля, подмешиваемые в тело запроса как есть."),
       },
     },
     async ({ id, name, budgetLimit, budgetLimitDay, maxPrice, dateEnd, targetings, extra }) => {
@@ -148,7 +148,7 @@ export function registerAdGroupTools(server: McpServer, client: VkAdsClient): vo
           ...extra,
         });
         if (Object.keys(body).length === 0) {
-          return fail("Provide at least one field to update.");
+          return fail("Нужно передать хотя бы одно поле для изменения.");
         }
         const result = await client.post(`v2/ad_groups/${id}.json`, body);
         return ok(result);
@@ -161,13 +161,13 @@ export function registerAdGroupTools(server: McpServer, client: VkAdsClient): vo
   server.registerTool(
     "ad_group_action",
     {
-      title: "Ad group action",
+      title: "Действие над группой объявлений",
       annotations: WRITE_DELETE,
       description:
-        "Changes the lifecycle status of ad groups by id: activate (status=active), stop (status=blocked) or delete (status=deleted).",
+        "Меняет статус групп объявлений по id: activate (status=active), stop (status=blocked) или delete (status=deleted).",
       inputSchema: {
         action: z.enum(["activate", "stop", "delete"]),
-        ids: z.array(z.number().int()).min(1).describe("Ad group ids to act on."),
+        ids: z.array(z.number().int()).min(1).describe("Id групп объявлений, к которым применить действие."),
       },
     },
     async ({ action, ids }) => {

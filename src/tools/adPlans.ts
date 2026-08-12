@@ -23,23 +23,23 @@ export function registerAdPlanTools(server: McpServer, client: VkAdsClient): voi
   server.registerTool(
     "list_ad_plans",
     {
-      title: "List ad plans (campaigns)",
+      title: "Список кампаний (ad_plans)",
       annotations: READ_ONLY,
       description:
-        "Lists ad plans (the top-level VK Ads campaign object) with optional filtering by id and status. Money fields (budget_limit, budget_limit_day, max_price) are in the account currency.",
+        "Возвращает список ad_plan (верхнеуровневый объект кампании в VK Рекламе) с необязательной фильтрацией по id и статусу. Денежные поля (budget_limit, budget_limit_day, max_price) — в валюте аккаунта.",
       inputSchema: {
-        ids: z.array(z.number().int()).optional().describe("Filter by ad plan ids."),
+        ids: z.array(z.number().int()).optional().describe("Фильтр по id кампаний."),
         statuses: z
           .array(z.enum(["active", "blocked", "deleted"]))
           .optional()
-          .describe("Filter by status."),
-        fields: z.array(z.string()).optional().describe("Ad plan fields to return."),
-        limit: z.number().int().min(1).max(250).optional().describe("Max objects per page (<=250)."),
-        offset: z.number().int().min(0).optional().describe("Pagination offset (objects to skip)."),
+          .describe("Фильтр по статусу."),
+        fields: z.array(z.string()).optional().describe("Поля кампании в ответе."),
+        limit: z.number().int().min(1).max(250).optional().describe("Сколько объектов на страницу (не больше 250)."),
+        offset: z.number().int().min(0).optional().describe("Смещение постраничной выдачи (сколько объектов пропустить)."),
         autoPaginate: z
           .boolean()
           .optional()
-          .describe("Fetch all pages by following offset/count (ignores limit as a total cap)."),
+          .describe("Забрать все страницы, идя по offset/count (limit при этом не ограничивает общее число объектов)."),
       },
     },
     async ({ ids, statuses, fields, limit, offset, autoPaginate }) => {
@@ -64,29 +64,29 @@ export function registerAdPlanTools(server: McpServer, client: VkAdsClient): voi
   server.registerTool(
     "create_ad_plan",
     {
-      title: "Create ad plan (campaign)",
+      title: "Создать кампанию (ad_plan)",
       annotations: WRITE_CREATE,
       description:
-        "Creates an ad plan (campaign). Money fields are in account currency. Pass complex or less common fields via `extra` (merged into the request body verbatim).",
+        "Создаёт кампанию (ad_plan). Денежные поля — в валюте аккаунта. Сложные и редкие поля передаются через `extra` (подмешиваются в тело запроса как есть).",
       inputSchema: {
-        name: z.string().min(1).describe("Ad plan name."),
+        name: z.string().min(1).describe("Название кампании."),
         objective: z
           .string()
           .optional()
-          .describe("Campaign objective, e.g. site_conversions, leadads, traffic."),
+          .describe("Цель кампании, например site_conversions, leadads, traffic."),
         autobiddingMode: z
           .string()
           .optional()
-          .describe("Auction strategy, e.g. max_goals, fixed, second_price_mean."),
-        budgetLimit: z.number().positive().optional().describe("Total budget in account currency."),
-        budgetLimitDay: z.number().positive().optional().describe("Daily budget in account currency."),
-        maxPrice: z.number().positive().optional().describe("Bid cap in account currency."),
-        dateStart: isoDate().optional().describe("Start date YYYY-MM-DD."),
-        dateEnd: isoDate().optional().describe("End date YYYY-MM-DD."),
+          .describe("Стратегия аукциона, например max_goals, fixed, second_price_mean."),
+        budgetLimit: z.number().positive().optional().describe("Общий бюджет в валюте аккаунта."),
+        budgetLimitDay: z.number().positive().optional().describe("Дневной бюджет в валюте аккаунта."),
+        maxPrice: z.number().positive().optional().describe("Предельная ставка в валюте аккаунта."),
+        dateStart: isoDate().optional().describe("Дата начала, YYYY-MM-DD."),
+        dateEnd: isoDate().optional().describe("Дата окончания, YYYY-MM-DD."),
         extra: z
           .record(z.any())
           .optional()
-          .describe("Extra ad plan fields merged into the body (e.g. priced_goal, pricelist_id)."),
+          .describe("Дополнительные поля кампании, подмешиваемые в тело запроса (например, priced_goal, pricelist_id)."),
       },
     },
     async ({ name, objective, autobiddingMode, budgetLimit, budgetLimitDay, maxPrice, dateStart, dateEnd, extra }) => {
@@ -113,18 +113,18 @@ export function registerAdPlanTools(server: McpServer, client: VkAdsClient): voi
   server.registerTool(
     "update_ad_plan",
     {
-      title: "Update ad plan (campaign)",
+      title: "Изменить кампанию (ad_plan)",
       annotations: WRITE_UPDATE,
       description:
-        "Updates an ad plan's name, budgets, bid cap or dates. Money fields are in account currency. Use ad_plan_action to change status.",
+        "Меняет у кампании название, бюджеты, предельную ставку или даты. Денежные поля — в валюте аккаунта. Для смены статуса — ad_plan_action.",
       inputSchema: {
-        id: z.number().int().describe("Ad plan id to update."),
-        name: z.string().min(1).optional().describe("New name."),
-        budgetLimit: z.number().positive().optional().describe("Total budget in account currency."),
-        budgetLimitDay: z.number().positive().optional().describe("Daily budget in account currency."),
-        maxPrice: z.number().positive().optional().describe("Bid cap in account currency."),
-        dateEnd: isoDate().optional().describe("New end date YYYY-MM-DD."),
-        extra: z.record(z.any()).optional().describe("Extra fields merged into the body verbatim."),
+        id: z.number().int().describe("Id изменяемой кампании."),
+        name: z.string().min(1).optional().describe("Новое название."),
+        budgetLimit: z.number().positive().optional().describe("Общий бюджет в валюте аккаунта."),
+        budgetLimitDay: z.number().positive().optional().describe("Дневной бюджет в валюте аккаунта."),
+        maxPrice: z.number().positive().optional().describe("Предельная ставка в валюте аккаунта."),
+        dateEnd: isoDate().optional().describe("Новая дата окончания, YYYY-MM-DD."),
+        extra: z.record(z.any()).optional().describe("Дополнительные поля, подмешиваемые в тело запроса как есть."),
       },
     },
     async ({ id, name, budgetLimit, budgetLimitDay, maxPrice, dateEnd, extra }) => {
@@ -138,7 +138,7 @@ export function registerAdPlanTools(server: McpServer, client: VkAdsClient): voi
           ...extra,
         });
         if (Object.keys(body).length === 0) {
-          return fail("Provide at least one field to update.");
+          return fail("Нужно передать хотя бы одно поле для изменения.");
         }
         const result = await client.post(`v2/ad_plans/${id}.json`, body);
         return ok(result);
@@ -151,13 +151,13 @@ export function registerAdPlanTools(server: McpServer, client: VkAdsClient): voi
   server.registerTool(
     "ad_plan_action",
     {
-      title: "Ad plan action",
+      title: "Действие над кампанией",
       annotations: WRITE_DELETE,
       description:
-        "Changes the lifecycle status of ad plans by id: activate (status=active), stop (status=blocked) or delete (status=deleted).",
+        "Меняет статус кампаний по id: activate (status=active), stop (status=blocked) или delete (status=deleted).",
       inputSchema: {
         action: z.enum(["activate", "stop", "delete"]),
-        ids: z.array(z.number().int()).min(1).describe("Ad plan ids to act on."),
+        ids: z.array(z.number().int()).min(1).describe("Id кампаний, к которым применить действие."),
       },
     },
     async ({ action, ids }) => {

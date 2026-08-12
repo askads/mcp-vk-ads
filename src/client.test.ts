@@ -151,7 +151,7 @@ test("getAll() flags truncation loudly at the maxPages cap", async () => {
   try {
     const result = await makeClient().getAll("v2/banners.json", {}, 2);
     assert.equal((result as { _truncated?: boolean })._truncated, true);
-    assert.match((result as { _truncatedNote?: string })._truncatedNote ?? "", /of 100000/);
+    assert.match((result as { _truncatedNote?: string })._truncatedNote ?? "", /из 100000/);
   } finally {
     mock.restore();
   }
@@ -318,7 +318,7 @@ test("request() aborts and reports a timeout when the request hangs", async () =
     })) as typeof fetch;
   try {
     const client = makeClient({ timeoutMs: 10 });
-    await assert.rejects(() => client.get("v2/ad_plans.json"), /timed out after 10ms/);
+    await assert.rejects(() => client.get("v2/ad_plans.json"), /превысил таймаут 10 мс/);
   } finally {
     globalThis.fetch = original;
   }
@@ -334,7 +334,7 @@ test("request() refuses an absolute path that resolves to a foreign origin (SSRF
     try {
       await assert.rejects(
         () => makeClient().get(evil),
-        /foreign origin/,
+        /чужой origin/,
         `expected "${evil}" to be rejected`,
       );
       // Crucially, the Bearer token never left for the foreign host.
@@ -367,7 +367,7 @@ test("getAll() caps the total items at MAX_AUTO_ITEMS and flags truncation", asy
     const result = await makeClient().getAll("v2/banners.json");
     assert.equal(result.items.length, MAX_AUTO_ITEMS);
     assert.equal((result as { _truncated?: boolean })._truncated, true);
-    assert.match((result as { _truncatedNote?: string })._truncatedNote ?? "", /of 100000/);
+    assert.match((result as { _truncatedNote?: string })._truncatedNote ?? "", /из 100000/);
     // Stopped by the item cap, not the 100-page default cap.
     assert.equal(calls, Math.ceil(MAX_AUTO_ITEMS / MAX_PAGE_LIMIT));
   } finally {

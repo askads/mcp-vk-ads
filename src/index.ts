@@ -31,18 +31,20 @@ import { registerRawTool } from "./tools/raw.js";
  * to every session's context, so keep it dense.
  */
 export const INSTRUCTIONS =
-  "VK Ads (VK Реклама) is the advertiser cabinet API at ads.vk.com — myTarget object lineage, not " +
-  "VK's social api.vk.com. Objects nest: ad_plan (campaign) → ad_group → banner (ad). `status` is " +
-  "the only settable state field (stop sets blocked = paused, not banned); `delivery` and " +
-  "`moderation_status` are read-only diagnostics, and money is in account currency (rubles) as " +
-  "returned, no micro-units. Writes take one object per request, so a batch can end up partly " +
-  "applied; the result names the failed ids. Pages cap at 250 and autoPaginate at 1000 objects " +
-  "(flagged `_truncated`). 429s are retried with backoff (see get_throttling before bulk loops); " +
-  "5xx and timeouts are retried on reads only, since a failed write may have committed anyway — " +
-  "list before re-creating. `invalid_token` means an expired token only the user can replace — do " +
-  "not retry; raw_request refuses absolute URLs, paths are relative and versioned. There is no " +
-  "sandbox: every call hits a live account with real budget, and the typed create/update/*_action " +
-  "tools apply at once — only raw_request gates writes behind confirmWrite.";
+  "VK Реклама (VK Ads) — API рекламного кабинета на ads.vk.com: объектная модель унаследована от " +
+  "myTarget, это не социальный api.vk.com. Объекты вложены: ad_plan (кампания) → ad_group (группа " +
+  "объявлений) → banner (объявление). `status` — единственное состояние, которое можно задать " +
+  "(stop ставит blocked = пауза, а не бан); `delivery` и `moderation_status` — диагностика только " +
+  "на чтение; деньги — в валюте аккаунта (рубли) как есть, без микроединиц. Запись меняет один " +
+  "объект за запрос, поэтому пакет может примениться частично — в ответе перечислены id, на " +
+  "которых произошёл сбой. Страница ограничена 250 объектами, autoPaginate — 1000 (помечается " +
+  "`_truncated`). 429 повторяются с нарастающей паузой (перед массовыми циклами — get_throttling); " +
+  "5xx и таймауты повторяются только на чтении: сорвавшаяся запись могла всё же примениться, " +
+  "поэтому перед повторным созданием нужен список. `invalid_token` — истёкший токен, заменить его " +
+  "может только пользователь: повторять бесполезно. raw_request не принимает абсолютные URL, пути " +
+  "относительные и с версией. Песочницы нет: каждый вызов идёт в живой аккаунт с реальным " +
+  "бюджетом, а типизированные create/update/*_action применяются сразу — подтверждение " +
+  "confirmWrite нужно только для raw_request.";
 
 /**
  * Loads the config, reporting the drop-off if it is missing. An unconfigured
@@ -55,7 +57,7 @@ async function loadConfigOrExit(telemetry: Telemetry): Promise<VkAdsConfig> {
     return loadConfig();
   } catch (err) {
     if (!(err instanceof ConfigError)) throw err;
-    console.error(`Error: ${err.message}`);
+    console.error(`Ошибка: ${err.message}`);
     await telemetry.sendBlocking("startup_failed", { reason: err.reason });
     process.exit(1);
   }
@@ -97,6 +99,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error("Fatal error starting mcp-vk-ads:", err);
+  console.error("Критическая ошибка при запуске mcp-vk-ads:", err);
   process.exit(1);
 });

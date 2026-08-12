@@ -14,15 +14,15 @@ export function registerAccountTools(server: McpServer, client: VkAdsClient): vo
   server.registerTool(
     "get_user_info",
     {
-      title: "Get account info",
+      title: "Информация об аккаунте",
       annotations: READ_ONLY,
       description:
-        "Returns information about the current VK Ads account (user.json), including additional_info.client_name. Use it to confirm which advertiser account the token points at.",
+        "Возвращает информацию о текущем аккаунте VK Рекламы (user.json), включая additional_info.client_name. Позволяет убедиться, на какой аккаунт рекламодателя указывает токен.",
       inputSchema: {
         fields: z
           .array(z.string())
           .optional()
-          .describe("User fields to return. Defaults to a common set."),
+          .describe("Поля пользователя в ответе. По умолчанию — базовый набор."),
       },
     },
     async ({ fields }) => {
@@ -40,18 +40,18 @@ export function registerAccountTools(server: McpServer, client: VkAdsClient): vo
   server.registerTool(
     "get_balance",
     {
-      title: "Get account balance",
+      title: "Баланс аккаунта",
       annotations: READ_ONLY,
       description:
-        "Returns the current VK Ads account balance: available funds and currency. " +
-        "Calls user.json with the `account` field, which carries the wallet " +
-        "(account.balance, account.currency). Reports the balance of the account the " +
-        "token points at (no parameters). " +
-        "Note: the exact balance field name in v3/user.json on the new ads.vk.com " +
-        "platform is not confirmed against a live cabinet (the domain is JS-gated); " +
-        "the schema follows the myTarget/VK Ads object model (v2/v3). This tool returns " +
-        "the RAW VK response unchanged, so a caller can read account.balance defensively " +
-        "regardless of the exact shape — verify on the first live account with read_payments.",
+        "Возвращает текущий баланс аккаунта VK Рекламы: доступные средства и валюту. " +
+        "Вызывает user.json с полем `account`, в котором лежит кошелёк " +
+        "(account.balance, account.currency). Показывает баланс того аккаунта, на который " +
+        "указывает токен (параметров нет). " +
+        "Важно: точное имя поля с балансом в v3/user.json на новой платформе ads.vk.com " +
+        "не подтверждено на живом кабинете (домен закрыт JS); схема следует объектной " +
+        "модели myTarget/VK Ads (v2/v3). Инструмент отдаёт СЫРОЙ ответ VK без изменений, " +
+        "поэтому вызывающая сторона может аккуратно прочитать account.balance независимо от " +
+        "точной формы ответа — проверить на первом живом аккаунте с доступом read_payments.",
       // Balance comes from the account the token belongs to — no inputs.
       inputSchema: {},
     },
@@ -76,10 +76,10 @@ export function registerAccountTools(server: McpServer, client: VkAdsClient): vo
   server.registerTool(
     "get_throttling",
     {
-      title: "Get API rate limits",
+      title: "Лимиты запросов к API",
       annotations: READ_ONLY,
       description:
-        "Returns the current VK Ads request limits and remaining budget (throttling.json), so you can avoid hitting the rate limit.",
+        "Возвращает текущие лимиты запросов VK Рекламы и их остаток (throttling.json) — чтобы не упереться в лимит.",
       inputSchema: {},
     },
     async () => {
@@ -95,21 +95,21 @@ export function registerAccountTools(server: McpServer, client: VkAdsClient): vo
   server.registerTool(
     "get_regions",
     {
-      title: "Get regions",
+      title: "Список регионов",
       annotations: READ_ONLY,
       description:
-        "Lists VK Ads geo regions (id, name, type), optionally filtered by a name substring. Region ids are needed for ad group geo targeting.",
+        "Возвращает гео-регионы VK Рекламы (id, name, type), при необходимости отфильтрованные по подстроке названия. Id регионов нужны для гео-таргетинга группы объявлений.",
       inputSchema: {
         query: z
           .string()
           .optional()
-          .describe("Case-insensitive substring to filter region names (e.g. \"Москва\")."),
+          .describe("Подстрока для фильтра по названию региона, без учёта регистра (например, «Москва»)."),
         limit: z
           .number()
           .int()
           .min(1)
           .optional()
-          .describe("Max regions to return after filtering. Default 50."),
+          .describe("Сколько регионов вернуть после фильтрации. По умолчанию 50."),
       },
     },
     async ({ query, limit }) => {

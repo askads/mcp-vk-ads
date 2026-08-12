@@ -53,7 +53,7 @@ test("get_statistics fails loud when an ids filter returns 0 objects", async () 
   const { tools } = harness({ getResult: { count: 0, items: [] } });
   const res = await tools.get_statistics({ entity: "banners", ids: [123] });
   assert.equal(res.isError, true);
-  assert.match(res.content[0].text, /0 objects/);
+  assert.match(res.content[0].text, /0 объектов/);
 });
 
 test("get_statistics routes autoPaginate through getAll", async () => {

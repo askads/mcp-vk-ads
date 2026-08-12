@@ -31,7 +31,7 @@ export class VkAdsError extends Error {
 
 /** Turns a parsed VK Ads error body into a short, readable message. */
 function formatErrorBody(body: unknown): string {
-  if (body == null) return "(no body)";
+  if (body == null) return "(пустое тело ответа)";
   if (typeof body === "string") return body.slice(0, 500);
   if (typeof body !== "object") return String(body);
 
