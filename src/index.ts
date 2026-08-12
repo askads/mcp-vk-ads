@@ -24,6 +24,27 @@ import { registerStatisticsTools } from "./tools/statistics.js";
 import { registerRawTool } from "./tools/raw.js";
 
 /**
+ * Shipped as the `instructions` of the MCP initialize result — the only prose the
+ * calling model gets before it picks a tool, in every session. It carries what the
+ * tool list cannot: which VK product this actually is, what the API refuses to do,
+ * where the money is, and the failures that look like something else. It is charged
+ * to every session's context, so keep it dense.
+ */
+export const INSTRUCTIONS =
+  "VK Ads (VK Реклама) is the advertiser cabinet API at ads.vk.com — myTarget object lineage, not " +
+  "VK's social api.vk.com. Objects nest: ad_plan (campaign) → ad_group → banner (ad). `status` is " +
+  "the only settable state field (stop sets blocked = paused, not banned); `delivery` and " +
+  "`moderation_status` are read-only diagnostics, and money is in account currency (rubles) as " +
+  "returned, no micro-units. Writes take one object per request, so a batch can end up partly " +
+  "applied; the result names the failed ids. Pages cap at 250 and autoPaginate at 1000 objects " +
+  "(flagged `_truncated`). 429s are retried with backoff (see get_throttling before bulk loops); " +
+  "5xx and timeouts are retried on reads only, since a failed write may have committed anyway — " +
+  "list before re-creating. `invalid_token` means an expired token only the user can replace — do " +
+  "not retry; raw_request refuses absolute URLs, paths are relative and versioned. There is no " +
+  "sandbox: every call hits a live account with real budget, and the typed create/update/*_action " +
+  "tools apply at once — only raw_request gates writes behind confirmWrite.";
+
+/**
  * Loads the config, reporting the drop-off if it is missing. An unconfigured
  * server dies before the MCP handshake, so this ping is the only trace such an
  * install ever leaves — and it has to be awaited, or process.exit() below would
@@ -48,10 +69,14 @@ async function main(): Promise<void> {
   const config = await loadConfigOrExit(telemetry);
   const client = new VkAdsClient(config);
 
-  const server = new McpServer({
-    name: "mcp-vk-ads",
-    version: readVersion(),
-  });
+  const server = new McpServer(
+    {
+      name: "mcp-vk-ads",
+      version: readVersion(),
+    },
+    // Surfaces in the initialize result, before the client sees a single tool.
+    { instructions: INSTRUCTIONS },
+  );
 
   instrumentToolCalls(server, telemetry);
   server.server.oninitialized = () => {

@@ -7,6 +7,15 @@
 
 ## [Unreleased]
 
+## [1.4.2] — 2026-08-12
+
+### Добавлено
+
+- Инструкции сервера. В ответе MCP `initialize` теперь едет короткая справка для вызывающей
+  модели: чем этот API является и чем не является, чего он не умеет, а также квоты, правила
+  повторов и обманчивые ошибки, влияющие на то, как им пользоваться. Раньше это знание жило
+  только в README, который модель не читает.
+
 ## [1.4.0] — 2026-08-07
 
 ### Добавлено
@@ -127,7 +136,8 @@
   и lifecycle-действия (activate/stop/delete), статистика, справочники (регионы),
   `raw_request` (escape hatch на любой эндпойнт), пагинация (offset + авто по offset/count).
 
-[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.4.2...HEAD
+[1.4.2]: https://github.com/askads/mcp-vk-ads/releases/tag/v1.4.2
 [1.4.0]: https://github.com/askads/mcp-vk-ads/releases/tag/v1.4.0
 [1.3.0]: https://github.com/askads/mcp-vk-ads/releases/tag/v1.3.0
 [1.2.0]: https://github.com/askads/mcp-vk-ads/compare/v1.1.4...v1.2.0
