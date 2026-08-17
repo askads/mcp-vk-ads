@@ -273,6 +273,7 @@ claude mcp list
 
 ## Техническая документация
 
+- [Каталог MCP-возможностей](./docs/capabilities/index.md) — страницы по пользовательским задачам для каждого инструмента.
 - [Все инструменты и параметры](./docs/TOOLS.md)
 - [Документация по разработке](./docs/DEVELOPMENT.md)
 - [Пакет в npm](https://www.npmjs.com/package/mcp-vk-ads)
