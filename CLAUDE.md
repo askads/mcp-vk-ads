@@ -55,6 +55,8 @@ More detail in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Tool list: [docs/TOOL
 
 ## Adding a tool
 
+Before changing the tool registry, read [the MCP capability documentation contract](docs/CAPABILITY-DOCUMENTATION.md). Every registered tool must have exactly one task-oriented page in `docs/capabilities/`; update that page, the index, and the coverage test in the same change.
+
 1. Add (or extend) `src/tools/<name>.ts` with `register<Name>Tools(server, client)`.
 2. Import and call it in `src/index.ts`.
 3. Add a `*.test.ts` using the mock-fetch / fake-client harness (no network).
