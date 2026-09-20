@@ -42,6 +42,9 @@
 
 ## [1.4.2] — 2026-08-12
 
+Отдельным релизом версия не выходила: тега `v1.4.2` нет, а изменения уехали в npm в
+составе 1.5.0. Раздел оставлен, чтобы история была полной.
+
 ### Добавлено
 
 - Инструкции сервера. В ответе MCP `initialize` теперь едет короткая справка для вызывающей
@@ -174,7 +177,7 @@
 
 [Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.5.0...HEAD
 [1.5.0]: https://github.com/askads/mcp-vk-ads/compare/v1.4.1...v1.5.0
-[1.4.2]: https://github.com/askads/mcp-vk-ads/releases/tag/v1.4.2
+[1.4.2]: https://github.com/askads/mcp-vk-ads/compare/v1.4.1...7a59eda
 [1.4.0]: https://github.com/askads/mcp-vk-ads/releases/tag/v1.4.0
 [1.3.0]: https://github.com/askads/mcp-vk-ads/releases/tag/v1.3.0
 [1.2.0]: https://github.com/askads/mcp-vk-ads/compare/v1.1.4...v1.2.0
