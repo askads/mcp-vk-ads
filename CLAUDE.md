@@ -18,22 +18,33 @@ More detail in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Tool list: [docs/TOOL
 ## Architecture
 
 - `src/client.ts` — HTTP client over `https://ads.vk.com/api` (override with
-  `VK_ADS_API_BASE`): Bearer auth, AbortController timeout (covers reading the body),
+  `VK_ADS_API_BASE`): Bearer auth resolved per request from `TokenStore` (so a login
+  mid-session takes effect at once) with one silent refresh+replay on 401,
+  AbortController timeout (covers reading the body),
   SSRF guard (`buildUrl` refuses a path resolving off the API origin), retry/backoff
   (honors `Retry-After`) — 429 for any method, but 5xx and network errors ONLY for
   idempotent GET (a retried POST could duplicate a create), `getAll` offset/count
   pagination, `VkAdsError(status, body)`. No sandbox, no quota header, no async report polling.
-- `src/tools/*.ts` — one file per area (`account`, `adPlans`, `adGroups`, `banners`,
+- `src/tools/*.ts` — one file per area (`auth`, `account`, `adPlans`, `adGroups`, `banners`,
   `statistics`, `raw`), each exports `register<Name>Tools(server, client)`.
+- `src/oauth.ts` / `src/auth.ts` / `src/credentials.ts` — the in-chat login.
+  `oauth.ts` talks to `v2/oauth2/token.json` (mint + refresh, VK's error codes turned
+  into advice); `TokenStore` resolves the token per request (env `VK_ADS_TOKEN` wins,
+  else the stored login) and refreshes it; `credentials.ts` is the 0600 file under
+  `~/.config/mcp-vk-ads/`. `finish_login` stores the **client_secret** on purpose —
+  VK refuses a `refresh_token` grant without it.
 - `src/tools/util.ts` — shared helpers (see conventions below).
 - `src/index.ts` — wires every `register*` into the McpServer.
 - `src/telemetry.ts` — anonymous usage pings (ids/names/versions only, never data or
   arguments; fire-and-forget, must never block or throw; opt-out `ASKADS_TELEMETRY=0`).
-  `startup_failed` is the exception: `sendBlocking` awaits it, because the caller
-  exits right after and a fire-and-forget ping would die in flight. Its `reason`
-  is a closed vocabulary (`missing_token`, …) — never a variable's name or value.
-- `src/config.ts` — env → config; throws `ConfigError` (with a `reason` code) instead
-  of exiting, so `index.ts` can report the drop-off before dying.
+  A server without a token no longer dies, so it pings `unconfigured_start` instead of
+  `startup_failed` — keep them apart, or `server_start` stops meaning "a usable install
+  started". `reason` is a closed vocabulary (`missing_token`, `invalid_api_base`, …) —
+  never a variable's name or value.
+- `src/config.ts` — env → config. A **missing token is not an error**: the server starts
+  anyway so the user can connect from the chat (it used to exit before the MCP handshake,
+  leaving a red cross and nothing to read). A malformed value still throws `ConfigError`
+  (with a `reason` code), which `index.ts` carries into the session instead of exiting.
 
 ## Conventions (do not break)
 
@@ -50,6 +61,12 @@ More detail in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Tool list: [docs/TOOL
   (`.max(250)` in `inputSchema`); `autoPaginate` uses `getAll` at `MAX_PAGE_LIMIT`,
   caps the total at `MAX_AUTO_ITEMS` (token-bounded payload) and flags `_truncated`
   instead of silently cutting.
+- **The chat login is `client_credentials`, not a browser consent flow** — VK grants
+  `authorization_code` only to approved partners with a registered `redirect_uri`, so
+  `start_login` hands out instructions (no network, no state) and `finish_login` mints the
+  token from the user's own app. Every `finish_login` burns one of VK's 5 live tokens per
+  `client_id`+user, so it is not a retry path; `logout` deletes locally and never calls
+  `oauth2/token/delete.json` (that would wipe every token of that user for the app).
 - **Runtime guidance for the consuming model goes in the tool `description`,** not in this
   file — the external agent never reads CLAUDE.md. API gotchas belong in the tool's description.
 

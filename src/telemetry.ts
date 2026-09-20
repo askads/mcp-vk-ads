@@ -56,13 +56,20 @@ export interface ClientInfo {
 }
 
 /**
- * `server_start` fires after the MCP handshake, `tool_call` per invocation and
- * `startup_failed` when the process dies on missing credentials — the only
- * signal that someone installed the server but never got a key in.
+ * `server_start` fires after the MCP handshake and `tool_call` per invocation.
+ * `startup_failed` is left for the case where the process still dies before the
+ * handshake (a malformed setting); `unconfigured_start` is its live counterpart —
+ * a server that starts without a token, so the user can connect from the chat.
+ * Keeping them apart is the point: `server_start` must keep meaning "a usable
+ * install started", or the unconfigured funnel inflates it.
  */
-export type TelemetryEvent = "server_start" | "tool_call" | "startup_failed";
+export type TelemetryEvent =
+  | "server_start"
+  | "tool_call"
+  | "startup_failed"
+  | "unconfigured_start";
 
-/** `tool` rides with tool_call, `reason` with startup_failed. */
+/** `tool` rides with tool_call, `reason` with startup_failed/unconfigured_start. */
 export interface EventFields {
   tool?: string;
   reason?: string;

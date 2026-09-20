@@ -1,3 +1,4 @@
+import { AuthRequiredError, TokenStore } from "./auth.js";
 import type { VkAdsConfig } from "./types.js";
 import { VkAdsError } from "./types.js";
 
@@ -33,17 +34,29 @@ export class VkAdsClient {
   private readonly maxRetries: number;
   private readonly retryBaseMs: number;
 
-  constructor(private readonly config: VkAdsConfig) {
+  private readonly tokens: TokenStore;
+
+  constructor(
+    private readonly config: VkAdsConfig,
+    tokens?: TokenStore,
+  ) {
     // Normalize to a trailing slash so relative paths ("v2/ad_plans.json") resolve.
     this.base = config.apiBase.endsWith("/") ? config.apiBase : config.apiBase + "/";
     this.timeoutMs = config.timeoutMs ?? 60_000;
     this.maxRetries = config.maxRetries ?? 3;
     this.retryBaseMs = config.retryBaseMs ?? 500;
+    // Default store keeps the old contract for callers that pass a plain config
+    // (tests, smoke): config.token wins, stored credentials are the fallback.
+    this.tokens = tokens ?? new TokenStore(config.token, { apiBase: config.apiBase });
   }
 
-  private headers(extra?: Record<string, string>): Record<string, string> {
+  /**
+   * Resolved per request, never cached on the instance: `finish_login` writes a
+   * new token to disk mid-session and the very next call has to pick it up.
+   */
+  private async headers(extra?: Record<string, string>): Promise<Record<string, string>> {
     return {
-      Authorization: `Bearer ${this.config.token}`,
+      Authorization: `Bearer ${await this.tokens.getToken()}`,
       "Accept-Language": this.config.lang,
       ...extra,
     };
@@ -114,6 +127,9 @@ export class VkAdsClient {
     const url = this.buildUrl(path, opts.query);
     const hasBody = opts.body !== undefined && method !== "GET";
     const idempotent = method === "GET";
+    // A stored token can be revoked (or die early) long before its stated expiry,
+    // and only the API knows: one silent re-mint + replay per request, then give up.
+    let refreshed = false;
 
     for (let attempt = 0; ; attempt++) {
       let res: Response;
@@ -123,12 +139,16 @@ export class VkAdsClient {
           url,
           {
             method,
-            headers: this.headers(hasBody ? { "Content-Type": "application/json" } : undefined),
+            headers: await this.headers(hasBody ? { "Content-Type": "application/json" } : undefined),
             body: hasBody ? JSON.stringify(opts.body) : undefined,
           },
           path,
         ));
       } catch (err) {
+        // "Not connected" is raised while building the auth header, inside this try —
+        // but it is not transport trouble: retrying burns the full backoff (seconds)
+        // before the user sees the one message that would actually help them.
+        if (err instanceof AuthRequiredError) throw err;
         // Network error / timeout: retry only idempotent (GET) requests; a non-GET
         // may have already reached the backend, so replaying it is unsafe.
         if (idempotent && attempt < this.maxRetries) {
@@ -150,6 +170,27 @@ export class VkAdsClient {
           data = JSON.parse(text);
         } catch {
           data = text;
+        }
+      }
+
+      // VK Ads answers a dead token with 401 (invalid_token / expired_token /
+      // revoked_token) — unlike a 403, which is a permission problem no re-mint
+      // fixes. Refresh once and replay; the retry budget above is for transport
+      // trouble and must not be spent here.
+      if (!res.ok && res.status === 401 && !refreshed && this.tokens.canRefresh()) {
+        refreshed = true;
+        try {
+          await this.tokens.refresh();
+          attempt--;
+          continue;
+        } catch (err) {
+          // The refresh itself failed (access revoked, month of inactivity, network
+          // down): surface the actionable message instead of the original 401.
+          if (err instanceof AuthRequiredError) throw err;
+          throw new AuthRequiredError(
+            `Не удалось обновить токен VK Рекламы: ${err instanceof Error ? err.message : String(err)}. ` +
+              "Вызовите start_login и подключитесь заново.",
+          );
         }
       }
 

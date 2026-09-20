@@ -2,8 +2,9 @@
 import { readFileSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { TokenStore } from "./auth.js";
 import { VkAdsClient } from "./client.js";
-import { ConfigError, loadConfig } from "./config.js";
+import { ConfigError, DEFAULT_API_BASE, loadConfig } from "./config.js";
 import { instrumentToolCalls, Telemetry } from "./telemetry.js";
 import type { VkAdsConfig } from "./types.js";
 
@@ -16,6 +17,7 @@ function readVersion(): string {
     return "0.0.0";
   }
 }
+import { registerAuthTools } from "./tools/auth.js";
 import { registerAccountTools } from "./tools/account.js";
 import { registerAdPlanTools } from "./tools/adPlans.js";
 import { registerAdGroupTools } from "./tools/adGroups.js";
@@ -40,26 +42,50 @@ export const INSTRUCTIONS =
   "которых произошёл сбой. Страница ограничена 250 объектами, autoPaginate — 1000 (помечается " +
   "`_truncated`). 429 повторяются с нарастающей паузой (перед массовыми циклами — get_throttling); " +
   "5xx и таймауты повторяются только на чтении: сорвавшаяся запись могла всё же примениться, " +
-  "поэтому перед повторным созданием нужен список. `invalid_token` — истёкший токен, заменить его " +
-  "может только пользователь: повторять бесполезно. raw_request не принимает абсолютные URL, пути " +
+  "поэтому перед повторным созданием нужен список. `invalid_token` — истёкший токен: после входа " +
+  "через start_login сервер обновляет его сам, а заданный в VK_ADS_TOKEN заменяет только " +
+  "пользователь. raw_request не принимает абсолютные URL, пути " +
   "относительные и с версией. Песочницы нет: каждый вызов идёт в живой аккаунт с реальным " +
   "бюджетом, а типизированные create/update/*_action применяются сразу — подтверждение " +
   "confirmWrite нужно только для raw_request.";
 
 /**
- * Loads the config, reporting the drop-off if it is missing. An unconfigured
- * server dies before the MCP handshake, so this ping is the only trace such an
- * install ever leaves — and it has to be awaited, or process.exit() below would
- * kill the request in flight.
+ * Prepended to INSTRUCTIONS when no token is available. The model reads this
+ * before it picks a tool, so an unconfigured session opens with the fix rather
+ * than with a failed call.
  */
-async function loadConfigOrExit(telemetry: Telemetry): Promise<VkAdsConfig> {
+const UNCONFIGURED_PREFIX =
+  "ВНИМАНИЕ: VK Реклама ещё не подключена — токена нет, поэтому любой инструмент данных вернёт " +
+  "ошибку. Подключение делается прямо в диалоге и без перезапуска клиента: вызовите start_login, " +
+  "покажите пользователю инструкцию, попросите создать приложение в кабинете (Настройки → Доступ " +
+  "к API) и прислать client_id и client_secret, затем передайте их в finish_login. ";
+
+/**
+ * Loads the config without dying on a bad value. A server that exits here never
+ * completes the MCP handshake, so the user sees a red cross and no reason — the
+ * failure that used to account for nearly every unconfigured install. Instead the
+ * problem is carried into the session, where the model can read it and relay it.
+ */
+function loadConfigOrDegraded(telemetry: Telemetry): {
+  config: VkAdsConfig;
+  problem?: ConfigError;
+} {
   try {
-    return loadConfig();
+    return { config: loadConfig() };
   } catch (err) {
     if (!(err instanceof ConfigError)) throw err;
-    console.error(`Ошибка: ${err.message}`);
-    await telemetry.sendBlocking("startup_failed", { reason: err.reason });
-    process.exit(1);
+    console.error(`Ошибка конфигурации: ${err.message}`);
+    // Fire-and-forget now that the process survives: the historical
+    // `startup_failed` funnel stays comparable, but nothing blocks startup.
+    telemetry.send("startup_failed", { reason: err.reason });
+    return {
+      config: {
+        token: process.env.VK_ADS_TOKEN || undefined,
+        lang: process.env.VK_ADS_LANG || "ru",
+        apiBase: DEFAULT_API_BASE,
+      },
+      problem: err,
+    };
   }
 }
 
@@ -68,8 +94,13 @@ async function main(): Promise<void> {
   // opt out with ASKADS_TELEMETRY=0. Built before the config so a missing token
   // can be reported; wired to the server before tools register.
   const telemetry = new Telemetry(readVersion());
-  const config = await loadConfigOrExit(telemetry);
-  const client = new VkAdsClient(config);
+  const { config, problem } = loadConfigOrDegraded(telemetry);
+  const tokens = new TokenStore(config.token, { apiBase: config.apiBase });
+  const client = new VkAdsClient(config, tokens);
+
+  // Resolved once, at startup, only to pick the instructions text: the token
+  // itself is re-read per request, so a login mid-session still takes effect.
+  const connected = tokens.hasToken();
 
   const server = new McpServer(
     {
@@ -77,15 +108,25 @@ async function main(): Promise<void> {
       version: readVersion(),
     },
     // Surfaces in the initialize result, before the client sees a single tool.
-    { instructions: INSTRUCTIONS },
+    {
+      instructions: connected
+        ? INSTRUCTIONS
+        : UNCONFIGURED_PREFIX +
+          (problem ? `Проблема конфигурации: ${problem.message} ` : "") +
+          INSTRUCTIONS,
+    },
   );
 
   instrumentToolCalls(server, telemetry);
   server.server.oninitialized = () => {
     telemetry.setClientInfo(server.server.getClientVersion());
-    telemetry.send("server_start");
+    // Split on purpose: `server_start` keeps meaning "a usable install started",
+    // so the unconfigured case gets its own event instead of inflating that number.
+    if (connected) telemetry.send("server_start");
+    else telemetry.send("unconfigured_start", { reason: problem?.reason ?? "missing_token" });
   };
 
+  registerAuthTools(server, client, tokens);
   registerAccountTools(server, client);
   registerAdPlanTools(server, client);
   registerAdGroupTools(server, client);
@@ -95,7 +136,9 @@ async function main(): Promise<void> {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("mcp-vk-ads running on stdio");
+  console.error(
+    `mcp-vk-ads running on stdio${connected ? "" : " (без токена — подключение через start_login)"}`,
+  );
 }
 
 main().catch((err) => {

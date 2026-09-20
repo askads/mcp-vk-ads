@@ -1,5 +1,9 @@
 export interface VkAdsConfig {
-  token: string;
+  /**
+   * VK_ADS_TOKEN, when set. Optional: without it the token comes from the
+   * credentials file written by the in-chat login (see TokenStore).
+   */
+  token?: string;
   /** Accept-Language header sent with every request. */
   lang: string;
   /** API root, without a version segment. Defaults to https://ads.vk.com/api. */
