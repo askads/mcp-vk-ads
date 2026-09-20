@@ -8,21 +8,21 @@
     "url": "https://github.com/askads/mcp-vk-ads",
     "source": "github"
   },
-  "version": "1.4.2",
+  "version": "1.5.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "mcp-vk-ads",
-      "version": "1.4.2",
+      "version": "1.5.0",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
         {
           "name": "VK_ADS_TOKEN",
-          "description": "VK Ads OAuth2 access token (Bearer) — full account access. Treat it as a secret.",
-          "isRequired": true,
+          "description": "Optional ready-made VK Ads OAuth2 access token (Bearer) for CI and unattended installs — full account access, treat it as a secret. Without it the server connects from the chat via start_login/finish_login.",
+          "isRequired": false,
           "isSecret": true
         },
         {
