@@ -4,8 +4,8 @@
   "version": "1.5.0",
   "description": "Work with a VK Ads account from Claude: campaigns, ad groups, ads and performance statistics.",
   "author": {
-    "name": "AskAds",
-    "url": "https://askads.ru"
+    "name": "gistrec",
+    "url": "https://gistrec.cloud"
   },
   "homepage": "https://github.com/askads/mcp-vk-ads#readme",
   "repository": "https://github.com/askads/mcp-vk-ads",
