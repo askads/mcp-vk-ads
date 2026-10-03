@@ -1,0 +1,47 @@
+{
+  "name": "mcp-vk-ads",
+  "displayName": "VK Ads MCP",
+  "version": "1.5.0",
+  "description": "Work with a VK Ads account from Claude: campaigns, ad groups, ads and performance statistics.",
+  "author": {
+    "name": "AskAds",
+    "url": "https://askads.ru"
+  },
+  "homepage": "https://github.com/askads/mcp-vk-ads#readme",
+  "repository": "https://github.com/askads/mcp-vk-ads",
+  "license": "MIT",
+  "keywords": [
+    "vk-ads",
+    "advertising",
+    "marketing",
+    "analytics"
+  ],
+  "userConfig": {
+    "token": {
+      "type": "string",
+      "title": "VK Ads access token",
+      "description": "Access token for the VK Ads API. Stored in your operating system's credential store, never in settings.json.",
+      "sensitive": true,
+      "required": true
+    },
+    "telemetry": {
+      "type": "string",
+      "title": "Anonymous telemetry",
+      "description": "Set to 0 to disable the anonymous usage telemetry the server sends by default. Leave as 1 to keep it on.",
+      "default": "1"
+    }
+  },
+  "mcpServers": {
+    "vk-ads": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-vk-ads@1.5.0"
+      ],
+      "env": {
+        "VK_ADS_TOKEN": "${user_config.token}",
+        "ASKADS_TELEMETRY": "${user_config.telemetry}"
+      }
+    }
+  }
+}
