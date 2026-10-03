@@ -1,7 +1,7 @@
 {
   "name": "mcp-vk-ads",
   "displayName": "VK Ads MCP",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Work with a VK Ads account from Claude: campaigns, ad groups, ads and performance statistics.",
   "author": {
     "name": "gistrec",
@@ -37,7 +37,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "mcp-vk-ads@1.5.0"
+        "mcp-vk-ads@1.5.1"
       ],
       "env": {
         "VK_ADS_TOKEN": "${user_config.token}",
