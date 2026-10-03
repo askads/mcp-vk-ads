@@ -10,6 +10,7 @@
   "homepage": "https://github.com/askads/mcp-vk-ads#readme",
   "repository": "https://github.com/askads/mcp-vk-ads",
   "license": "MIT",
+  "privacyPolicyUrl": "https://askads.ru/privacy-policy",
   "keywords": [
     "vk-ads",
     "advertising",
