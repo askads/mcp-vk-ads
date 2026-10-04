@@ -23,7 +23,7 @@
       "title": "VK Ads access token",
       "description": "Access token for the VK Ads API. Stored in your operating system's credential store, never in settings.json.",
       "sensitive": true,
-      "required": true
+      "default": ""
     },
     "telemetry": {
       "type": "string",
