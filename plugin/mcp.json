@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "vk-ads": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-vk-ads@latest"
+      ]
+    }
+  }
+}
