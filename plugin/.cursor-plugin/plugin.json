@@ -1,0 +1,19 @@
+{
+  "name": "mcp-vk-ads",
+  "displayName": "VK Реклама MCP",
+  "description": "MCP-сервер для VK Ads — управляйте рекламой (кампании, группы, объявления, статистика) из Claude, Cursor, Codex и других AI-клиентов.",
+  "author": {
+    "name": "Aleksandr Kovalko & Zinnur Temerbekov"
+  },
+  "homepage": "https://github.com/askads/mcp-vk-ads#readme",
+  "repository": "https://github.com/askads/mcp-vk-ads",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "vk",
+    "vk-ads",
+    "advertising"
+  ],
+  "logo": "https://raw.githubusercontent.com/askads/mcp-vk-ads/HEAD/plugin/.claude-plugin/icon.png"
+}
