@@ -7,6 +7,15 @@
 
 ## [Unreleased]
 
+## [1.6.1] — 2026-10-22
+
+### Исправлено
+
+- `get_statistics` снова принимает `autoPaginate` вместе с `period: "day"` и в `summary` без дат.
+  1.6.0 отвергал эту комбинацию, хотя до неё она работала: в этих режимах VK отдаёт все объекты
+  одним ответом, и `autoPaginate` там ничего не меняет. Ошибкой остаются только `limit`, `offset`,
+  `sortBy` и `order` — их VK вне `summary` с датами молча игнорирует.
+
 ## [1.6.0] — 2026-10-22
 
 ### Исправлено
@@ -200,6 +209,7 @@
   `raw_request` (escape hatch на любой эндпойнт), пагинация (offset + авто по offset/count).
 
 [Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.5.0...HEAD
+[1.6.1]: https://github.com/askads/mcp-vk-ads/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/askads/mcp-vk-ads/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/askads/mcp-vk-ads/compare/v1.4.1...v1.5.0
 [1.4.2]: https://github.com/askads/mcp-vk-ads/compare/v1.4.1...7a59eda

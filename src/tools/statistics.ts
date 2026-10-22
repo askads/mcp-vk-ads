@@ -15,7 +15,7 @@ export function registerStatisticsTools(server: McpServer, client: VkAdsClient):
       description:
         "Возвращает статистику по кампаниям (ad_plans), группам объявлений (ad_groups) или объявлениям (banners). По умолчанию группировка `summary` — одна сводная строка (`items[].total`) на объект: с dateFrom/dateTo — за этот период, без дат — за всё время. " +
         "`day` нужна ТОЛЬКО для динамики и вопросов про тренд: добавляет к каждому объекту `rows` по дням, даты обязательны. Недель и месяцев API не отдаёт — их собирают из `day`. " +
-        "Ранжирование на стороне сервера (sortBy, например base.spent, и order) и постраничная выдача (limit/offset/autoPaginate) работают только в `summary` с датами — в остальных режимах VK их молча игнорирует, поэтому инструмент вернёт ошибку. " +
+        "Ранжирование на стороне сервера (sortBy, например base.spent, и order) и постраничная выдача (limit/offset) работают только в `summary` с датами — в остальных режимах VK их молча игнорирует, поэтому инструмент вернёт ошибку. Там VK и так отдаёт все объекты одним ответом, так что autoPaginate безвреден в любом режиме. " +
         "`total` в ответе — сумма по объектам ЭТОЙ страницы (при фильтре по ids — по этим объектам), а не по всему кабинету. Метрики лежат в `base` (shows, clicks, spent, ...); spent — в валюте аккаунта.",
       inputSchema: {
         entity: z.enum(ENTITIES).optional().describe("Тип объектов для отчёта. По умолчанию banners."),
@@ -40,7 +40,7 @@ export function registerStatisticsTools(server: McpServer, client: VkAdsClient):
         order: z.enum(["asc", "desc"]).optional().describe("Направление сортировки для sortBy. По умолчанию desc."),
         limit: z.number().int().min(1).max(250).optional().describe("Сколько объектов на страницу (не больше 250)."),
         offset: z.number().int().min(0).optional().describe("Смещение постраничной выдачи (сколько объектов пропустить)."),
-        autoPaginate: z.boolean().optional().describe("Забрать все страницы, идя по offset/count."),
+        autoPaginate: z.boolean().optional().describe("Забрать все страницы, идя по offset/count (в day и summary без дат ответ и так полный)."),
       },
     },
     async ({ entity, period, ids, dateFrom, dateTo, metrics, sortBy, order, limit, offset, autoPaginate }) => {
@@ -55,9 +55,9 @@ export function registerStatisticsTools(server: McpServer, client: VkAdsClient):
         // day.json, all-time totals in v2 summary.json; both ignore sort/paging silently.
         // v3 summary/week/month and v2 week/month are 404.
         const paged = grp === "summary" && Boolean(dateFrom);
-        if (!paged && (sortBy || order || limit !== undefined || offset !== undefined || autoPaginate)) {
+        if (!paged && (sortBy || order || limit !== undefined || offset !== undefined)) {
           return fail(
-            "sortBy/order/limit/offset/autoPaginate работают только в группировке summary с dateFrom/dateTo — " +
+            "sortBy/order/limit/offset работают только в группировке summary с dateFrom/dateTo — " +
               "VK игнорирует их без периода и в day. Передайте период или уберите эти параметры.",
           );
         }
@@ -74,9 +74,13 @@ export function registerStatisticsTools(server: McpServer, client: VkAdsClient):
           limit,
           offset,
         });
-        const result = autoPaginate ? await client.getAll(path, query) : await client.get(path, query);
+        // The v2 endpoints aren't paged — one response already holds every object — so
+        // autoPaginate there is a plain get, not an error: callers that always pass it
+        // (daily series over every plan) worked before 1.6.0 and must keep working.
+        const pageAll = autoPaginate && paged;
+        const result = pageAll ? await client.getAll(path, query) : await client.get(path, query);
         // getAll keeps the last page's `total`, which covers that page only — misleading.
-        if (autoPaginate) delete (result as { total?: unknown }).total;
+        if (pageAll) delete (result as { total?: unknown }).total;
         // fail-loud: явный фильтр по ids, но 0 объектов — почти всегда неверный id/период.
         // Пустой ответ провоцирует модель снять фильтр; явная ошибка заставляет его починить.
         const items = (result as { items?: unknown[] } | undefined)?.items;
