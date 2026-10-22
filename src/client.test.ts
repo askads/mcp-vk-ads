@@ -95,6 +95,64 @@ test("request() throws VkAdsError with the status and parsed body on 4xx", async
   }
 });
 
+test("request() keeps the per-field details of a validation_failed error", async () => {
+  const mock = mockFetch(
+    () =>
+      new Response(
+        JSON.stringify({
+          error: {
+            code: "validation_failed",
+            message: "Validation failed",
+            fields: { ad_groups: { code: "required", message: "This field is required" } },
+          },
+        }),
+        { status: 400 },
+      ),
+  );
+  try {
+    await assert.rejects(
+      () => makeClient().post("v2/ad_plans.json", {}),
+      (err: unknown) =>
+        err instanceof VkAdsError &&
+        /\[validation_failed\] Validation failed/.test(err.message) &&
+        /"ad_groups"/.test(err.message) &&
+        /This field is required/.test(err.message),
+    );
+  } finally {
+    mock.restore();
+  }
+});
+
+test("request() carries VK's x-request-id into the error, once", async () => {
+  const mock = mockFetch(
+    () =>
+      new Response(JSON.stringify({ error: { code: "validation_failed", message: "Validation failed" } }), {
+        status: 400,
+        headers: { "x-request-id": "05b0e8b7, 05b0e8b7" },
+      }),
+  );
+  try {
+    await assert.rejects(
+      () => makeClient().post("v2/ad_plans.json", {}),
+      (err: unknown) =>
+        err instanceof VkAdsError && err.requestId === "05b0e8b7" && /\(request_id 05b0e8b7\)$/.test(err.message),
+    );
+  } finally {
+    mock.restore();
+  }
+});
+
+test("request() formats an object-style error without details as code + message", async () => {
+  const mock = mockFetch(
+    () => new Response(JSON.stringify({ error: { code: "WRONG_RESOURCE", message: "page not found" } }), { status: 404 }),
+  );
+  try {
+    await assert.rejects(() => makeClient().get("v2/x.json"), /: HTTP 404: \[WRONG_RESOURCE\] page not found$/);
+  } finally {
+    mock.restore();
+  }
+});
+
 test("request() formats an OAuth-style error body", async () => {
   const mock = mockFetch(
     () =>
