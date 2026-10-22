@@ -73,10 +73,10 @@ const AD_PLANS = {
   ],
 };
 
-// Сводка v3 statistics (grouping summary) за 2026-06-27..2026-07-03: метрики в
+// Сводка v3 statistics (grouping summary — в v3 это day.json: итог за период) за 2026-06-27..2026-07-03: метрики в
 // `base`, spent/cpc/cpa — Decimal-строки в валюте кабинета (рубли). Арифметика
 // сходится: ctr = clicks/shows, cpc = spent/clicks, cpa = spent/goals; `total` —
-// сводка по всем объектам (65 290 ₽, 282 конверсии → CPA 231.52).
+// сумма по объектам страницы (здесь все кампании на одной) (65 290 ₽, 282 конверсии → CPA 231.52).
 const STATISTICS = {
   count: 4,
   offset: 0,
@@ -119,7 +119,7 @@ globalThis.fetch = async (input, init) => {
 
   if (url.host === "ads.vk.com") {
     if (url.pathname === "/api/v2/ad_plans.json") return json(AD_PLANS);
-    if (url.pathname === "/api/v3/statistics/ad_plans/summary.json") return json(STATISTICS);
+    if (url.pathname === "/api/v3/statistics/ad_plans/day.json") return json(STATISTICS);
     if (url.pathname === "/api/v3/user.json") return json(USER);
     return apiError(`${init?.method ?? "GET"} ${url.pathname}`);
   }
