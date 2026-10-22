@@ -81,6 +81,18 @@ test("get_statistics fails loud when an ids filter returns 0 objects", async () 
   assert.match(res.content[0].text, /0 объектов/);
 });
 
+// v2 day/summary are unpaged — one response holds every object — so autoPaginate
+// there is a plain get, and the response's `total` is kept (it covers everything).
+test("get_statistics treats autoPaginate on unpaged day as a single plain get", async () => {
+  const { calls, tools } = harness({ getResult: { items: [{ id: 1, rows: [] }], total: { base: {} } } });
+  const res = await tools.get_statistics({ entity: "ad_plans", period: "day", autoPaginate: true, ...PERIOD });
+  assert.equal(res.isError, undefined);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].kind, "get");
+  assert.equal(calls[0].path, "v2/statistics/ad_plans/day.json");
+  assert.match(res.content[0].text, /"total"/);
+});
+
 test("get_statistics routes autoPaginate through getAll and drops the last-page total", async () => {
   const { calls, tools } = harness({ getAllResult: { count: 1, items: [{ id: 1 }], total: { base: {} } } });
   const res = await tools.get_statistics({ entity: "banners", autoPaginate: true, ...PERIOD });
