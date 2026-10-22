@@ -7,6 +7,30 @@
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-10-22
+
+### Исправлено
+
+- Ошибки валидации VK теряли подробности: от `{"error": {"code", "message", "fields"}}` оставались
+  только код и сообщение, и любая неудача выглядела как голое `Validation failed` (#14). Теперь в
+  тексте ошибки есть `fields` — поле и причина, включая вложенные ошибки по группам — и
+  `request_id` из `x-request-id`, который спрашивает поддержка VK.
+- `get_statistics` по умолчанию отвечал 404: в v3 нет группировки `summary`, есть только
+  `day.json`, и он отдаёт итог за период по каждому объекту (без строк по дням), с сортировкой и
+  пагинацией. Теперь `summary` с датами идёт в v3 `day.json`, `summary` без дат — в v2
+  `summary.json` (итог за всё время), `day` — в v2 `day.json` (строки по дням).
+
+### Изменено
+
+- `create_ad_plan` описывает контракт создания, проверенный на живом кабинете: нужна хотя бы
+  одна группа в `extra.campaigns`, у кампании на сайт — `ad_object_type: "url"` +
+  `ad_object_id` (без них любой `package_id` отвергается как `invalid_package`), для `max_goals` —
+  `priced_goal` у группы. Кампанию без групп и `budgetLimit` вместе с `budgetLimitDay` инструмент
+  отвергает сам, не тратя запрос.
+- `get_statistics`: группировки `week` и `month` убраны — их нет ни в v2, ни в v3. Сортировка и
+  пагинация вне `summary` с датами — ошибка, а не молча проигнорированный параметр. При
+  `autoPaginate` поле `total` не возвращается: VK считает его только по последней странице.
+
 ## [1.5.0] — 2026-09-20
 
 ### Добавлено
@@ -176,6 +200,7 @@
   `raw_request` (escape hatch на любой эндпойнт), пагинация (offset + авто по offset/count).
 
 [Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.5.0...HEAD
+[1.6.0]: https://github.com/askads/mcp-vk-ads/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/askads/mcp-vk-ads/compare/v1.4.1...v1.5.0
 [1.4.2]: https://github.com/askads/mcp-vk-ads/compare/v1.4.1...7a59eda
 [1.4.0]: https://github.com/askads/mcp-vk-ads/releases/tag/v1.4.0
