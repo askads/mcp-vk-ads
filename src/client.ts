@@ -194,7 +194,11 @@ export class VkAdsClient {
         }
       }
 
-      if (!res.ok) throw new VkAdsError(res.status, data);
+      if (!res.ok) {
+        // VK echoes the header twice ("id,id"); one copy is what support asks for.
+        const requestId = res.headers.get("x-request-id")?.split(",")[0].trim() || undefined;
+        throw new VkAdsError(res.status, data, requestId);
+      }
       return data as T;
     }
   }
@@ -217,8 +221,8 @@ export class VkAdsClient {
    *
    * Pages at MAX_PAGE_LIMIT regardless of a caller `limit` (which would otherwise
    * shrink capacity to limit×maxPages) → deterministic MAX_PAGE_LIMIT × maxPages.
-   * Carries through `total` (statistics: the summary across ALL objects — same on
-   * every page). If the maxPages cap is hit with more remaining, flags `_truncated`
+   * Carries through the last page's `total` (statistics: it sums that page only,
+   * checked live — callers that page through statistics drop it). If the maxPages cap is hit with more remaining, flags `_truncated`
    * so the cutoff is explicit, not a silent items.length < count.
    *
    * `maxItems` caps the total returned objects (default {@link MAX_AUTO_ITEMS}) to keep

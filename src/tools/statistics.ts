@@ -4,7 +4,7 @@ import type { VkAdsClient } from "../client.js";
 import { compact, csv, fail, isoDate, ok, READ_ONLY } from "./util.js";
 
 const ENTITIES = ["ad_plans", "ad_groups", "banners"] as const;
-const PERIODS = ["day", "week", "month", "summary"] as const;
+const PERIODS = ["summary", "day"] as const;
 
 export function registerStatisticsTools(server: McpServer, client: VkAdsClient): void {
   server.registerTool(
@@ -13,19 +13,22 @@ export function registerStatisticsTools(server: McpServer, client: VkAdsClient):
       title: "Статистика",
       annotations: READ_ONLY,
       description:
-        "Возвращает статистику по кампаниям (ad_plans), группам объявлений (ad_groups) или объявлениям (banners) из сервиса статистики VK Рекламы v3. По умолчанию группировка `summary` — одна сводная строка на объект за весь период; day/week/month нужны ТОЛЬКО для динамики по дням и вопросов про тренд (каждая добавляет по строке на объект за период). Ранжирование на стороне сервера — через sortBy (например, base.spent) и order; в ответе есть также `total` — сводка по ВСЕМ объектам за период (для вопросов «сколько всего» суммировать строки не нужно). Метрики лежат в `base` (shows, clicks, spent, ...); spent — в валюте аккаунта.",
+        "Возвращает статистику по кампаниям (ad_plans), группам объявлений (ad_groups) или объявлениям (banners). По умолчанию группировка `summary` — одна сводная строка (`items[].total`) на объект: с dateFrom/dateTo — за этот период, без дат — за всё время. " +
+        "`day` нужна ТОЛЬКО для динамики и вопросов про тренд: добавляет к каждому объекту `rows` по дням, даты обязательны. Недель и месяцев API не отдаёт — их собирают из `day`. " +
+        "Ранжирование на стороне сервера (sortBy, например base.spent, и order) и постраничная выдача (limit/offset/autoPaginate) работают только в `summary` с датами — в остальных режимах VK их молча игнорирует, поэтому инструмент вернёт ошибку. " +
+        "`total` в ответе — сумма по объектам ЭТОЙ страницы (при фильтре по ids — по этим объектам), а не по всему кабинету. Метрики лежат в `base` (shows, clicks, spent, ...); spent — в валюте аккаунта.",
       inputSchema: {
         entity: z.enum(ENTITIES).optional().describe("Тип объектов для отчёта. По умолчанию banners."),
         period: z
           .enum(PERIODS)
           .optional()
-          .describe("Группировка: summary (весь период, по умолчанию) либо day/week/month для динамики."),
+          .describe("Группировка: summary (итог по объекту, по умолчанию) либо day для динамики по дням."),
         ids: z
           .array(z.number().int())
           .optional()
           .describe("Ограничить отчёт этими id объектов (выбранного entity)."),
-        dateFrom: isoDate().optional().describe("Дата начала, YYYY-MM-DD (обязательна для day/week/month)."),
-        dateTo: isoDate().optional().describe("Дата окончания, YYYY-MM-DD (обязательна для day/week/month)."),
+        dateFrom: isoDate().optional().describe("Дата начала, YYYY-MM-DD (обязательна для day; для summary без дат — итог за всё время)."),
+        dateTo: isoDate().optional().describe("Дата окончания, YYYY-MM-DD (обязательна для day)."),
         metrics: z
           .array(z.string())
           .optional()
@@ -44,10 +47,23 @@ export function registerStatisticsTools(server: McpServer, client: VkAdsClient):
       try {
         const ent = entity ?? "banners";
         const grp = period ?? "summary";
-        if (grp !== "summary" && (!dateFrom || !dateTo)) {
+        if (Boolean(dateFrom) !== Boolean(dateTo) || (grp === "day" && !dateFrom)) {
           return fail(`Для группировки "${grp}" нужны и dateFrom, и dateTo (YYYY-MM-DD).`);
         }
-        const path = `v3/statistics/${ent}/${grp}.json`;
+        // Checked live: v3 has only day.json, and it returns one period total per object
+        // (no daily rows) with sort/paging — that IS the summary. Daily rows live in v2
+        // day.json, all-time totals in v2 summary.json; both ignore sort/paging silently.
+        // v3 summary/week/month and v2 week/month are 404.
+        const paged = grp === "summary" && Boolean(dateFrom);
+        if (!paged && (sortBy || order || limit !== undefined || offset !== undefined || autoPaginate)) {
+          return fail(
+            "sortBy/order/limit/offset/autoPaginate работают только в группировке summary с dateFrom/dateTo — " +
+              "VK игнорирует их без периода и в day. Передайте период или уберите эти параметры.",
+          );
+        }
+        const path = paged
+          ? `v3/statistics/${ent}/day.json`
+          : `v2/statistics/${ent}/${grp}.json`;
         const query = compact({
           id: csv(ids),
           date_from: dateFrom,
@@ -59,6 +75,8 @@ export function registerStatisticsTools(server: McpServer, client: VkAdsClient):
           offset,
         });
         const result = autoPaginate ? await client.getAll(path, query) : await client.get(path, query);
+        // getAll keeps the last page's `total`, which covers that page only — misleading.
+        if (autoPaginate) delete (result as { total?: unknown }).total;
         // fail-loud: явный фильтр по ids, но 0 объектов — почти всегда неверный id/период.
         // Пустой ответ провоцирует модель снять фильтр; явная ошибка заставляет его починить.
         const items = (result as { items?: unknown[] } | undefined)?.items;
