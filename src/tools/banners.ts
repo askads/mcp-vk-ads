@@ -70,7 +70,7 @@ export function registerBannerTools(server: McpServer, client: VkAdsClient): voi
       title: "Создать объявление (banner)",
       annotations: WRITE_CREATE,
       description:
-        "Создаёт объявление внутри группы объявлений. Креатив ссылается на загруженные медиа через `content`, тексты объявления — в `textblocks`, ссылки — в `urls`. Эти структуры отправляются как есть; точная форма для каждого формата объявления — в документации VK Рекламы.",
+        "Создаёт объявление внутри группы объявлений (POST v2/ad_groups/{adGroupId}/banners.json; верхний v2/banners.json — только список). Креатив ссылается на загруженные медиа через `content`, тексты объявления — в `textblocks`, ссылки — в `urls`. Эти структуры отправляются как есть; точная форма для каждого формата объявления — в документации VK Рекламы.",
       inputSchema: {
         adGroupId: z.number().int().describe("Id родительской группы объявлений."),
         name: z.string().min(1).optional().describe("Название объявления."),
@@ -85,15 +85,16 @@ export function registerBannerTools(server: McpServer, client: VkAdsClient): voi
     },
     async ({ adGroupId, name, textblocks, urls, content, extra }) => {
       try {
+        // The parent group is in the path: v2/banners.json is the list endpoint, and a
+        // live smoke in the tishin-serg fork created a banner only through this path.
         const body = compact({
-          ad_group_id: adGroupId,
           name,
           textblocks,
           urls,
           content,
           ...extra,
         });
-        const result = await client.post("v2/banners.json", body);
+        const result = await client.post(`v2/ad_groups/${adGroupId}/banners.json`, body);
         return ok(result);
       } catch (e) {
         return fail(e);
