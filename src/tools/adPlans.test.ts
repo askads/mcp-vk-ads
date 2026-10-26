@@ -57,7 +57,7 @@ test("create_ad_plan refuses a plan without ad groups before calling VK", async 
   const result = await create({ name: "X", extra: { status: "blocked" } });
 
   assert.equal(result.isError, true);
-  assert.match(text(result), /extra\.campaigns/);
+  assert.match(text(result), /adGroups/);
   assert.equal(calls.length, 0);
 });
 
@@ -84,4 +84,35 @@ test("create_ad_plan sends a paused plan with snake_case fields and extra merged
     ad_object_id: "115205574",
     campaigns: [GROUP],
   });
+});
+
+test("create_ad_plan sends adGroups as the campaigns VK accepts", async () => {
+  const calls: unknown[][] = [];
+  const create = captureTool("create_ad_plan", recordingClient(calls));
+  const result = await create({ name: "X", adGroups: [GROUP], extra: { status: "blocked" } });
+
+  assert.equal(result.isError, undefined);
+  assert.deepEqual(calls[0][1], { name: "X", status: "blocked", campaigns: [GROUP] });
+});
+
+test("create_ad_plan takes extra.ad_groups as a synonym and never sends both spellings", async () => {
+  const calls: unknown[][] = [];
+  const create = captureTool("create_ad_plan", recordingClient(calls));
+  await create({ name: "X", extra: { ad_groups: [GROUP] } });
+
+  assert.deepEqual(calls[0][1], { name: "X", campaigns: [GROUP] });
+});
+
+test("create_ad_plan refuses conflicting or existing groups before calling VK", async () => {
+  const calls: unknown[][] = [];
+  const create = captureTool("create_ad_plan", recordingClient(calls));
+  for (const args of [
+    { name: "X", adGroups: [GROUP], extra: { campaigns: [GROUP] } },
+    { name: "X", adGroups: [{ ...GROUP, id: 7 }] },
+    { name: "X", extra: { campaigns: [{ ...GROUP, ad_plan_id: 7 }] } },
+    { name: "X", extra: { ad_groups: [null] } },
+  ]) {
+    assert.equal((await create(args)).isError, true);
+  }
+  assert.equal(calls.length, 0);
 });
