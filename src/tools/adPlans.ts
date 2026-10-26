@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { VkAdsClient } from "../client.js";
-import { ACTION_TO_STATUS, compact, csv, fail, isoDate, ok, READ_ONLY, setStatusForIds, WRITE_CREATE, WRITE_DELETE, WRITE_UPDATE } from "./util.js";
+import { ACTION_TO_STATUS, BOTH_BUDGETS_ERROR, compact, csv, fail, hasBothBudgets, isoDate, ok, READ_ONLY, setStatusForIds, WRITE_CREATE, WRITE_DELETE, WRITE_UPDATE } from "./util.js";
 
 const DEFAULT_FIELDS = [
   "id",
@@ -87,7 +87,7 @@ export function registerAdPlanTools(server: McpServer, client: VkAdsClient): voi
           .optional()
           .describe("Стратегия аукциона, например max_goals, fixed, second_price_mean."),
         budgetLimit: z.number().positive().optional().describe("Общий бюджет в валюте аккаунта."),
-        budgetLimitDay: z.number().positive().optional().describe("Дневной бюджет в валюте аккаунта."),
+        budgetLimitDay: z.number().positive().optional().describe("Дневной бюджет в валюте аккаунта. Минимум по справке VK — 300 ₽ (у Дзена свой лимит)."),
         maxPrice: z.number().positive().optional().describe("Предельная ставка в валюте аккаунта."),
         dateStart: isoDate().optional().describe("Дата начала, YYYY-MM-DD."),
         dateEnd: isoDate().optional().describe("Дата окончания, YYYY-MM-DD."),
@@ -101,9 +101,6 @@ export function registerAdPlanTools(server: McpServer, client: VkAdsClient): voi
       try {
         // Both rejections are what VK itself answers — caught here so the model gets
         // the fix in one step instead of a validation_failed round-trip per field.
-        if (budgetLimit !== undefined && budgetLimitDay !== undefined) {
-          return fail("VK не принимает budgetLimit и budgetLimitDay вместе — передайте только одно из двух.");
-        }
         // VK accepts the nested groups as `campaigns` (checked live in #15) and as `ad_groups`
         // (checked live in the tishin-serg fork); both spellings are taken, one is sent.
         const { campaigns: extraCampaigns, ad_groups: extraAdGroups, ...rest } = extra ?? {};
@@ -133,6 +130,9 @@ export function registerAdPlanTools(server: McpServer, client: VkAdsClient): voi
           ...rest,
           campaigns: groups,
         });
+        if (hasBothBudgets(body) || groups.some((g) => hasBothBudgets(g as Record<string, unknown>))) {
+          return fail(BOTH_BUDGETS_ERROR);
+        }
         const result = await client.post("v2/ad_plans.json", body);
         return ok(result);
       } catch (e) {
@@ -152,7 +152,7 @@ export function registerAdPlanTools(server: McpServer, client: VkAdsClient): voi
         id: z.number().int().describe("Id изменяемой кампании."),
         name: z.string().min(1).optional().describe("Новое название."),
         budgetLimit: z.number().positive().optional().describe("Общий бюджет в валюте аккаунта."),
-        budgetLimitDay: z.number().positive().optional().describe("Дневной бюджет в валюте аккаунта."),
+        budgetLimitDay: z.number().positive().optional().describe("Дневной бюджет в валюте аккаунта. Минимум по справке VK — 300 ₽ (у Дзена свой лимит)."),
         maxPrice: z.number().positive().optional().describe("Предельная ставка в валюте аккаунта."),
         dateEnd: isoDate().optional().describe("Новая дата окончания, YYYY-MM-DD."),
         extra: z.record(z.any()).optional().describe("Дополнительные поля, подмешиваемые в тело запроса как есть."),
@@ -171,6 +171,7 @@ export function registerAdPlanTools(server: McpServer, client: VkAdsClient): voi
         if (Object.keys(body).length === 0) {
           return fail("Нужно передать хотя бы одно поле для изменения.");
         }
+        if (hasBothBudgets(body)) return fail(BOTH_BUDGETS_ERROR);
         const result = await client.post(`v2/ad_plans/${id}.json`, body);
         return ok(result);
       } catch (e) {

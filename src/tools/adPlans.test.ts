@@ -116,3 +116,26 @@ test("create_ad_plan refuses conflicting or existing groups before calling VK", 
   }
   assert.equal(calls.length, 0);
 });
+
+test("create_ad_plan refuses both budgets in a nested group or through extra before calling VK", async () => {
+  const calls: unknown[][] = [];
+  const create = captureTool("create_ad_plan", recordingClient(calls));
+  for (const args of [
+    { name: "X", budgetLimit: 5000, extra: { budget_limit_day: 500, campaigns: [GROUP] } },
+    { name: "X", adGroups: [{ ...GROUP, budget_limit: 5000, budget_limit_day: 500 }] },
+  ]) {
+    const result = await create(args);
+    assert.equal(result.isError, true);
+    assert.match(text(result), /только одно из двух/);
+  }
+  assert.equal(calls.length, 0);
+});
+
+test("update_ad_plan refuses both budgets; a null clearing one does not count", async () => {
+  const calls: unknown[][] = [];
+  const update = captureTool("update_ad_plan", recordingClient(calls));
+  assert.equal((await update({ id: 1, budgetLimit: 5000, budgetLimitDay: 500 })).isError, true);
+  assert.equal(calls.length, 0);
+  assert.equal((await update({ id: 1, budgetLimitDay: 500, extra: { budget_limit: null } })).isError, undefined);
+  assert.equal(calls.length, 1);
+});

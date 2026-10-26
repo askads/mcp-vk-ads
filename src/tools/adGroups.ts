@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { VkAdsClient } from "../client.js";
-import { ACTION_TO_STATUS, compact, csv, fail, isoDate, ok, READ_ONLY, setStatusForIds, WRITE_CREATE, WRITE_DELETE, WRITE_UPDATE } from "./util.js";
+import { ACTION_TO_STATUS, BOTH_BUDGETS_ERROR, compact, csv, fail, hasBothBudgets, isoDate, ok, READ_ONLY, setStatusForIds, WRITE_CREATE, WRITE_DELETE, WRITE_UPDATE } from "./util.js";
 
 const DEFAULT_FIELDS = [
   "id",
@@ -85,7 +85,7 @@ export function registerAdGroupTools(server: McpServer, client: VkAdsClient): vo
           .describe("Цель группы, например site_conversions, leadads, traffic."),
         autobiddingMode: z.string().optional().describe("Стратегия аукциона, например max_goals."),
         budgetLimit: z.number().positive().optional().describe("Общий бюджет в валюте аккаунта."),
-        budgetLimitDay: z.number().positive().optional().describe("Дневной бюджет в валюте аккаунта."),
+        budgetLimitDay: z.number().positive().optional().describe("Дневной бюджет в валюте аккаунта. Минимум по справке VK — 300 ₽ (у Дзена свой лимит)."),
         maxPrice: z.number().positive().optional().describe("Предельная ставка в валюте аккаунта."),
         price: z.number().positive().optional().describe("Цена оптимизируемого события в валюте аккаунта."),
         dateStart: isoDate().optional().describe("Дата начала, YYYY-MM-DD."),
@@ -110,6 +110,7 @@ export function registerAdGroupTools(server: McpServer, client: VkAdsClient): vo
           targetings: args.targetings,
           ...args.extra,
         });
+        if (hasBothBudgets(body)) return fail(BOTH_BUDGETS_ERROR);
         const result = await client.post("v2/ad_groups.json", body);
         return ok(result);
       } catch (e) {
@@ -129,7 +130,7 @@ export function registerAdGroupTools(server: McpServer, client: VkAdsClient): vo
         id: z.number().int().describe("Id изменяемой группы объявлений."),
         name: z.string().min(1).optional().describe("Новое название."),
         budgetLimit: z.number().positive().optional().describe("Общий бюджет в валюте аккаунта."),
-        budgetLimitDay: z.number().positive().optional().describe("Дневной бюджет в валюте аккаунта."),
+        budgetLimitDay: z.number().positive().optional().describe("Дневной бюджет в валюте аккаунта. Минимум по справке VK — 300 ₽ (у Дзена свой лимит)."),
         maxPrice: z.number().positive().optional().describe("Предельная ставка в валюте аккаунта."),
         dateEnd: isoDate().optional().describe("Новая дата окончания, YYYY-MM-DD."),
         targetings: z.record(z.any()).optional().describe("Новая структура таргетинга взамен прежней, отправляется как есть."),
@@ -150,6 +151,7 @@ export function registerAdGroupTools(server: McpServer, client: VkAdsClient): vo
         if (Object.keys(body).length === 0) {
           return fail("Нужно передать хотя бы одно поле для изменения.");
         }
+        if (hasBothBudgets(body)) return fail(BOTH_BUDGETS_ERROR);
         const result = await client.post(`v2/ad_groups/${id}.json`, body);
         return ok(result);
       } catch (e) {
