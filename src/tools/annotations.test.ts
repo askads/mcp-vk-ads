@@ -4,6 +4,7 @@ import { registerAccountTools } from "./account.js";
 import { registerAdPlanTools } from "./adPlans.js";
 import { registerAdGroupTools } from "./adGroups.js";
 import { registerBannerTools } from "./banners.js";
+import { registerMediaTools } from "./media.js";
 import { registerStatisticsTools } from "./statistics.js";
 import { registerRawTool } from "./raw.js";
 
@@ -27,6 +28,7 @@ function collectAnnotations(): Record<string, Annotations | undefined> {
     registerAdPlanTools,
     registerAdGroupTools,
     registerBannerTools,
+    registerMediaTools,
     registerStatisticsTools,
     registerRawTool,
   ];
@@ -77,7 +79,7 @@ test("update tools are idempotent, non-destructive writes", () => {
 });
 
 test("create tools are non-destructive, non-idempotent writes", () => {
-  const creates = ["create_ad_plan", "create_ad_group", "create_banner"];
+  const creates = ["create_ad_plan", "create_ad_group", "create_banner", "upload_image"];
   for (const name of creates) {
     assert.equal(ANN[name]?.readOnlyHint, false, `${name} should not be readOnly`);
     assert.equal(ANN[name]?.destructiveHint, false, `${name} should not be destructive`);

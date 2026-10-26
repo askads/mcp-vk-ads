@@ -127,6 +127,7 @@ export class VkAdsClient {
     const url = this.buildUrl(path, opts.query);
     const hasBody = opts.body !== undefined && method !== "GET";
     const idempotent = method === "GET";
+    const isForm = opts.body instanceof FormData;
     // A stored token can be revoked (or die early) long before its stated expiry,
     // and only the API knows: one silent re-mint + replay per request, then give up.
     let refreshed = false;
@@ -139,8 +140,9 @@ export class VkAdsClient {
           url,
           {
             method,
-            headers: await this.headers(hasBody ? { "Content-Type": "application/json" } : undefined),
-            body: hasBody ? JSON.stringify(opts.body) : undefined,
+            // fetch sets the multipart boundary itself, so FormData gets no Content-Type.
+            headers: await this.headers(hasBody && !isForm ? { "Content-Type": "application/json" } : undefined),
+            body: hasBody ? (isForm ? (opts.body as FormData) : JSON.stringify(opts.body)) : undefined,
           },
           path,
         ));
