@@ -7,6 +7,32 @@
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-10-26
+
+### Добавлено
+
+- `upload_image`: загрузка JPEG/PNG в медиатеку (multipart `v2/content/static.json`) — base64 и
+  размеры картинки, в ответе `id` и `variants`. Раньше объявление с картинкой было не создать: `content`
+  требует id медиа, а `raw_request` отправляет только JSON. Формат проверяется по байтам, некорректный
+  base64 и префикс `data:` отклоняются до запроса.
+- `create_ad_plan`: параметр `adGroups` для первых групп кампании. Раньше обязательные группы жили только
+  в `extra.campaigns`, и имя поля модель узнавала из описания; `extra.campaigns` и `extra.ad_groups`
+  остаются синонимами. Группы с `id`/`ad_plan_id` и передача групп двумя способами отклоняются до запроса.
+
+### Исправлено
+
+- `create_banner` слал POST в `v2/banners.json` — это список объявлений. Теперь объявление создаётся в
+  `v2/ad_groups/{adGroupId}/banners.json`; проверено вживую на заблокированных объектах.
+- Общий и дневной бюджет в одном объекте VK отклоняет. Отказ до запроса был только на верхнем уровне
+  `create_ad_plan`; теперь он срабатывает в create/update кампаний и групп, во вложенных группах и для
+  бюджета из `extra` (`null`, сбрасывающий бюджет, не в счёт).
+
+### Изменено
+
+- Описания: `ad_plan_action delete` удаляет только кампанию — её группы и объявления остаются, их удаляют
+  отдельно; картинка должна подходить слоту по размеру (`image_600x600` — не шире 600 px, иначе `bad_width`);
+  у `budgetLimitDay` указан минимум 300 ₽ по справке VK.
+
 ## [1.6.1] — 2026-10-22
 
 ### Исправлено
@@ -208,7 +234,8 @@
   и lifecycle-действия (activate/stop/delete), статистика, справочники (регионы),
   `raw_request` (escape hatch на любой эндпойнт), пагинация (offset + авто по offset/count).
 
-[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/askads/mcp-vk-ads/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/askads/mcp-vk-ads/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/askads/mcp-vk-ads/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/askads/mcp-vk-ads/compare/v1.4.1...v1.5.0
