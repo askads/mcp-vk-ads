@@ -66,6 +66,17 @@
   пагинация вне `summary` с датами — ошибка, а не молча проигнорированный параметр. При
   `autoPaginate` поле `total` не возвращается: VK считает его только по последней странице.
 
+## [1.5.1] — 2026-10-03
+
+### Добавлено
+- Плагин для каталога Anthropic (`plugin/`): манифест `.claude-plugin/plugin.json`, README, лицензия,
+  иконка каталога и скилл `vk-ads-audit`. Плагин запускает опубликованный npm-пакет с точной версией
+  и спрашивает креденшелы через `userConfig`, а не из окружения; телеметрия раскрыта в README и
+  отключается в настройках плагина. Указана политика конфиденциальности.
+
+### Изменено
+- В пакет входит `npm-shrinkwrap.json`: ревью лаунчера каталога требует зафиксированных зависимостей.
+
 ## [1.5.0] — 2026-09-20
 
 ### Добавлено
@@ -237,7 +248,8 @@
 [Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.7.0...HEAD
 [1.7.0]: https://github.com/askads/mcp-vk-ads/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/askads/mcp-vk-ads/compare/v1.6.0...v1.6.1
-[1.6.0]: https://github.com/askads/mcp-vk-ads/compare/v1.5.0...v1.6.0
+[1.6.0]: https://github.com/askads/mcp-vk-ads/compare/v1.5.1...v1.6.0
+[1.5.1]: https://github.com/askads/mcp-vk-ads/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/askads/mcp-vk-ads/compare/v1.4.1...v1.5.0
 [1.4.2]: https://github.com/askads/mcp-vk-ads/compare/v1.4.1...7a59eda
 [1.4.0]: https://github.com/askads/mcp-vk-ads/releases/tag/v1.4.0
