@@ -17,7 +17,7 @@ export function registerMediaTools(server: McpServer, client: VkAdsClient): void
       annotations: WRITE_CREATE,
       description:
         "Загружает изображение JPEG или PNG в медиатеку VK Рекламы (multipart POST v2/content/static.json) и возвращает его id и variants. " +
-        "Этот id передаётся в create_banner как content.<слот>={\"id\": <id>}; какие слоты нужны, зависит от формата (package) группы. " +
+        "Этот id передаётся в create_banner как content.<слот>={\"id\": <id>}; какие слоты нужны, зависит от формата (package) группы. Размер картинки должен подходить слоту: например, image_600x600 принимает не шире 600 px, иначе create_banner получит bad_width. " +
         "Байты передаются base64 без префикса data:, вместе с шириной и высотой картинки в пикселях. " +
         "При сетевой ошибке или 5xx загрузка могла пройти — не повторять вслепую.",
       inputSchema: {
