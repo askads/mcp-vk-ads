@@ -186,7 +186,8 @@ export function registerAdPlanTools(server: McpServer, client: VkAdsClient): voi
       title: "Действие над кампанией",
       annotations: WRITE_DELETE,
       description:
-        "Меняет статус кампаний по id: activate (status=active), stop (status=blocked) или delete (status=deleted).",
+        "Меняет статус кампаний по id: activate (status=active), stop (status=blocked) или delete (status=deleted). " +
+          "delete удаляет только саму кампанию: её группы и объявления остаются в прежнем статусе — их удаляют отдельно через ad_group_action и banner_action.",
       inputSchema: {
         action: z.enum(["activate", "stop", "delete"]),
         ids: z.array(z.number().int()).min(1).describe("Id кампаний, к которым применить действие."),

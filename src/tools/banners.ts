@@ -79,7 +79,7 @@ export function registerBannerTools(server: McpServer, client: VkAdsClient): voi
           .optional()
           .describe("Текстовые блоки, например {\"title\":{\"text\":\"...\"},\"text\":{\"text\":\"...\"}}."),
         urls: z.record(z.any()).optional().describe("Объекты ссылок, например {\"primary\":{\"url\":\"https://...\"}}."),
-        content: z.record(z.any()).optional().describe("Ссылки на содержимое креатива: {\"<слот>\": {\"id\": <id из upload_image>}}."),
+        content: z.record(z.any()).optional().describe("Ссылки на содержимое креатива: {\"<слот>\": {\"id\": <id из upload_image>}}. Картинка должна подходить слоту по размеру (image_600x600 — не шире 600 px)."),
         extra: z.record(z.any()).optional().describe("Дополнительные поля объявления, подмешиваемые в тело запроса как есть."),
       },
     },
