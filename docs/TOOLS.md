@@ -33,6 +33,7 @@
 | `list_ad_plans` / `create_ad_plan` / `update_ad_plan` / `ad_plan_action` | Список, создание, обновление (имя, бюджеты, ставка, даты), смена статуса. |
 | `list_ad_groups` / `create_ad_group` / `update_ad_group` / `ad_group_action` | Список, создание, обновление групп (бюджеты, ставка, `targetings`), смена статуса. |
 | `list_banners` / `create_banner` / `update_banner` / `banner_action` | Список, создание, обновление объявлений (`textblocks`, `urls`, `content`), смена статуса. |
+| `upload_image` | Загрузка JPEG/PNG (base64 + размеры) в медиатеку; возвращает id для `content` в `create_banner`. |
 
 `*_action` принимает `action`: `activate` (status=`active`), `stop` (status=`blocked`), `delete` (status=`deleted`) и список `ids`.
 

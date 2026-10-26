@@ -22,6 +22,7 @@ import { registerAccountTools } from "./tools/account.js";
 import { registerAdPlanTools } from "./tools/adPlans.js";
 import { registerAdGroupTools } from "./tools/adGroups.js";
 import { registerBannerTools } from "./tools/banners.js";
+import { registerMediaTools } from "./tools/media.js";
 import { registerStatisticsTools } from "./tools/statistics.js";
 import { registerRawTool } from "./tools/raw.js";
 
@@ -131,6 +132,7 @@ async function main(): Promise<void> {
   registerAdPlanTools(server, client);
   registerAdGroupTools(server, client);
   registerBannerTools(server, client);
+  registerMediaTools(server, client);
   registerStatisticsTools(server, client);
   registerRawTool(server, client);
 

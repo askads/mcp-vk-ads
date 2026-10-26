@@ -25,6 +25,19 @@ export function fail(err: unknown): CallToolResult {
 }
 
 /** Drops keys whose value is `undefined` so they are not sent to the API. */
+/**
+ * VK rejects an object that carries both budget_limit and budget_limit_day (checked
+ * live in #15 and in the tishin-serg fork, nested groups included). Checked on the
+ * final body, so a budget smuggled in through `extra` is caught too; null clears a
+ * field and does not count.
+ */
+export function hasBothBudgets(obj: Record<string, unknown>): boolean {
+  return obj.budget_limit != null && obj.budget_limit_day != null;
+}
+
+export const BOTH_BUDGETS_ERROR =
+  "VK не принимает общий и дневной бюджет вместе (budget_limit и budget_limit_day) — передайте только одно из двух.";
+
 export function compact<T extends Record<string, unknown>>(obj: T): T {
   return Object.fromEntries(
     Object.entries(obj).filter(([, v]) => v !== undefined),
