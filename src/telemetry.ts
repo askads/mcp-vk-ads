@@ -2,7 +2,7 @@
  * Anonymous usage telemetry — fire-and-forget pings to usage.gistrec.cloud.
  *
  * Privacy contract (mirrored by the receiver): only an anonymous random
- * instance id, event/tool names, a fixed-vocabulary failure reason and
+ * instance id, event/tool names, a fixed-vocabulary failure reason or tool outcome and
  * environment versions ever leave the machine. The API token, account data,
  * tool arguments, prompts and the names or values of environment variables are
  * never read, serialized or sent. Sends are capped at 2 s and swallow every
@@ -69,10 +69,12 @@ export type TelemetryEvent =
   | "startup_failed"
   | "unconfigured_start";
 
-/** `tool` rides with tool_call, `reason` with startup_failed/unconfigured_start. */
+/** `tool` rides with tool_call; `reason` with tool_call (a TOOL_OUTCOMES constant) and startup_failed/unconfigured_start. */
 export interface EventFields {
   tool?: string;
   reason?: string;
+  /** Masked excerpt of a failed tool_call's error (errorDetail). */
+  error_detail?: string;
 }
 
 export class Telemetry {
@@ -90,6 +92,11 @@ export class Telemetry {
   /** The MCP initialize handshake tells us which agent host is on the other side. */
   setClientInfo(info: ClientInfo | undefined): void {
     this.clientInfo = info;
+  }
+
+  /** Whether pings go out at all (ASKADS_TELEMETRY opt-out). */
+  isEnabled(): boolean {
+    return this.enabled;
   }
 
   /** Fire-and-forget: the server's own work never waits on a ping. */
@@ -116,7 +123,8 @@ export class Telemetry {
       client_name: this.clientInfo?.name,
       client_version: this.clientInfo?.version,
       tool: fields.tool,
-      reason: fields.reason,
+      reason: wireReason(event, fields.reason),
+      error_detail: event === "tool_call" ? fields.error_detail : undefined,
       node_version: process.version,
       os: process.platform,
     });
@@ -134,9 +142,142 @@ export class Telemetry {
 }
 
 /**
- * Count every tool invocation by name. Wraps registerTool once, before the
- * domain modules register their tools, so no per-tool wiring is needed.
- * Only the tool *name* is recorded — arguments never reach telemetry.
+ * How a tool call ended — the only thing about it, besides the tool name, that leaves the
+ * machine. A closed vocabulary: the error text is matched HERE, locally, and only one of
+ * these constants is sent.
+ */
+export const TOOL_OUTCOMES = [
+  "ok",
+  "error_auth",
+  "error_permission",
+  "error_not_found",
+  "error_rate_limit",
+  "error_invalid_request",
+  "error_upstream",
+  "error_timeout",
+  "error_network",
+  "error_internal",
+  "error_other",
+] as const;
+export type ToolOutcome = (typeof TOOL_OUTCOMES)[number];
+
+/**
+ * The last check before the wire, independent of the callers: a tool_call ships its reason
+ * only if it is one of TOOL_OUTCOMES; anything else is dropped here.
+ */
+function wireReason(event: TelemetryEvent, reason: string | undefined): string | undefined {
+  if (event !== "tool_call" || reason === undefined) return reason;
+  return (TOOL_OUTCOMES as readonly string[]).includes(reason) ? reason : undefined;
+}
+
+// First match wins, so the order matters: an auth failure often also says "invalid",
+// a rate limit often also says "403". Codes in brackets are Yandex Direct's ("[53] …");
+// Direct answers "no access to this client's account" with the auth code 53, hence the
+// permission line ahead of auth.
+const OUTCOME_PATTERNS: ReadonlyArray<readonly [ToolOutcome, RegExp]> = [
+  ["error_timeout", /timed?[ _-]?out|таймаут|ETIMEDOUT|AbortError|не был готов|not ready/i],
+  ["error_network", /ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|EPIPE|fetch failed|socket hang up/i],
+  ["error_rate_limit", /\b429\b|rate[ _-]?limit|too many requests|quota|квот|лимит|\[(?:56|152|506|9000)\]/i],
+  ["error_permission", /нет доступа к кабинету|не подключ[её]н к аккаунту/i],
+  [
+    "error_auth",
+    /\b401\b|unauthori[sz]ed|unauthenticated|invalid[ _-]?(?:token|grant|credentials)|token (?:expired|revoked)|login required|AuthRequired|авториз|не подключ|\[53\]/i,
+  ],
+  ["error_permission", /\b403\b|forbidden|access[ _-]?denied|permission|insufficient[ _-]?scope|нет доступа|\[(?:54|3228)\]/i],
+  ["error_not_found", /\b404\b|not[ _-]?found|не найден|не существует|\[8800\]/i],
+  ["error_upstream", /\b5\d\d\b|\b204\b|unavailable|недоступ|internal server error|bad gateway|\[(?:52|1000|1001|1002)\]/i],
+  ["error_invalid_request", /\b400\b|\b422\b|bad request|invalid|syntax|некоррект|неверн|недопустим|required|обязател|expected|must (?:be|contain|have)|\[(?:4000|4001|4003|5000|8000)\]/i],
+];
+
+function resultText(value: unknown): string {
+  if (value instanceof Error) return `${value.name} ${value.message}`;
+  const content = (value as { content?: unknown } | null)?.content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) => (part && typeof part === "object" && typeof part.text === "string" ? part.text : ""))
+    .join("\n");
+}
+
+/**
+ * Classifies a finished call: `toolOutcome(result)` for a returned result,
+ * `toolOutcome(undefined, error)` for a thrown one (whatever was thrown, `undefined` included).
+ * Reads the result/error text, returns only a TOOL_OUTCOMES constant.
+ */
+export function toolOutcome(result: unknown, ...thrown: [unknown?]): ToolOutcome {
+  const didThrow = thrown.length > 0;
+  if (!didThrow && !(result as { isError?: unknown } | null)?.isError) return "ok";
+  const text = resultText(didThrow ? thrown[0] : result);
+  for (const [outcome, pattern] of OUTCOME_PATTERNS) if (pattern.test(text)) return outcome;
+  return didThrow ? "error_internal" : "error_other";
+}
+
+/**
+ * Error excerpt for a failed call — a port of the Ask Ads gateway's journal excerpt. An
+ * allowlist: only the HTTP status (+ the text after it), an API code "[8000] …", tags like
+ * [HOST_NOT_VERIFIED], error_string/error_detail/error_type/message values and network
+ * markers are kept; any other text is dropped. Inside what is kept, e-mails, hosts, URLs,
+ * login/password/token values, Bearer, IPs, phones and any 4+ digit run become "#".
+ */
+export const DETAIL_MAX = 200;
+const PICK =
+  /\bHTTP (?<http>\d{3})\b(?::\s*(?<htext>[^{[]{1,100}))?|^(?:Ошибка: )?\[(?<bcode>\d{1,5})\]\s*(?<btext>[^;(]{1,120})|\[(?<tag>[A-Za-z][A-Za-z_]{2,})\]\s*(?<ttext>[^;(]{0,100})|\berror_code["']?\s*[:=]\s*["']?(?<code>\d{1,5})\b|\b(?<key>error_string|error_detail|error_type|message)["']?\s*[:=]\s*["']?(?<value>[^"'}\]]{1,80})|\b(?<net>ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|timed out|fetch failed|socket hang up|connection closed)\b|(?<netru>превысил таймаут)/gi;
+const SCRUB =
+  /(?<key>(?:login|password|secret|token|api[_-]?key|authorization)\s*[:=]\s*["']?|(?:bearer|basic)\s+)(?<val>[^,;]+)|[^\s,;]*(?:@|:\/\/|%3A|\p{L}\.\p{L})[^\s,;]*|\b(?:y0_|AQAA)\S+|\+?\d(?:[\s().-]*\d){3,}/giu;
+
+function scrub(value: string): string {
+  return value
+    .replace(SCRUB, (...args) => {
+      const groups = args[args.length - 1] as { key?: string };
+      return (groups.key ?? "") + "#";
+    })
+    .replace(/^[ ;:,.]+|[ ;:,.]+$/g, "");
+}
+
+/** The masked excerpt of an error text, or "" when nothing allowlisted is in it. */
+export function errorDetail(text: string): string {
+  const flat = text.slice(0, 2000).split(/\s+/).filter(Boolean).join(" ");
+  const parts: string[] = [];
+  PICK.lastIndex = 0;
+  for (let m = PICK.exec(flat); m; m = PICK.exec(flat)) {
+    const g = m.groups ?? {};
+    let token: string;
+    if (g.http) token = `HTTP ${g.http} ${scrub(g.htext ?? "")}`;
+    else if (g.bcode) token = `code=${g.bcode} ${scrub(g.btext ?? "")}`;
+    else if (g.tag) {
+      // Tags are upper-case only; the rest of PICK is case-insensitive.
+      if (!/^[A-Z][A-Z_]{2,}$/.test(g.tag)) {
+        PICK.lastIndex = m.index + 1;
+        continue;
+      }
+      token = `${g.tag} ${scrub(g.ttext ?? "")}`;
+    } else if (g.code) token = `code=${g.code}`;
+    else if (g.key) token = `${g.key.toLowerCase()}=${scrub(g.value ?? "")}`;
+    else token = (g.net ?? g.netru ?? "").toLowerCase();
+    token = token.trim();
+    if (!parts.includes(token)) parts.push(token);
+  }
+  return parts.join("; ").slice(0, DETAIL_MAX);
+}
+
+/** Best effort: classifying or sending must never change what the tool returns or throws. */
+function reportCall(telemetry: Telemetry, tool: string, value: unknown, thrown: boolean): void {
+  if (!telemetry.isEnabled()) return;
+  try {
+    const reason = thrown ? toolOutcome(undefined, value) : toolOutcome(value);
+    const detail = reason === "ok" ? "" : errorDetail(resultText(value));
+    telemetry.send("tool_call", { tool, reason, error_detail: detail || undefined });
+  } catch {
+    // a result shaped in a way the classifier did not expect — skip the ping, keep the call
+  }
+}
+
+/**
+ * Count every tool invocation by name and how it ended. Wraps registerTool once, before the
+ * domain modules register their tools, so no per-tool wiring is needed. Only the tool *name*
+ * and a TOOL_OUTCOMES constant are recorded, plus errorDetail's masked excerpt for a failed call —
+ * arguments, results and any other error text never reach telemetry.
+ * The ping goes out when the call finishes. Calls the SDK rejects on input validation never
+ * reach the wrapped callback and are not counted.
  */
 export function instrumentToolCalls(server: McpServer, telemetry: Telemetry): void {
   const original = server.registerTool.bind(server);
@@ -146,9 +287,16 @@ export function instrumentToolCalls(server: McpServer, telemetry: Telemetry): vo
     original(
       name,
       config as never,
-      ((...args: unknown[]) => {
-        telemetry.send("tool_call", { tool: name });
-        return (callback as (...a: unknown[]) => unknown)(...args);
+      (async (...args: unknown[]) => {
+        let result: unknown;
+        try {
+          result = await (callback as (...a: unknown[]) => unknown)(...args);
+        } catch (e) {
+          reportCall(telemetry, name, e, true);
+          throw e;
+        }
+        reportCall(telemetry, name, result, false);
+        return result;
       }) as never,
     )) as typeof server.registerTool;
 }
