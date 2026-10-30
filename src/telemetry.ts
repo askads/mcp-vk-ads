@@ -69,11 +69,10 @@ export type TelemetryEvent =
   | "startup_failed"
   | "unconfigured_start";
 
-/** `tool` rides with tool_call; `reason` with tool_call (a TOOL_OUTCOMES constant) and startup_failed/unconfigured_start. */
+/** `tool` and `error_detail` ride with tool_call; `reason` with tool_call and startup_failed/unconfigured_start. */
 export interface EventFields {
   tool?: string;
   reason?: string;
-  /** Masked excerpt of a failed tool_call's error (errorDetail). */
   error_detail?: string;
 }
 
@@ -94,7 +93,6 @@ export class Telemetry {
     this.clientInfo = info;
   }
 
-  /** Whether pings go out at all (ASKADS_TELEMETRY opt-out). */
   isEnabled(): boolean {
     return this.enabled;
   }
@@ -141,11 +139,7 @@ export class Telemetry {
   }
 }
 
-/**
- * How a tool call ended — the only thing about it, besides the tool name, that leaves the
- * machine. A closed vocabulary: the error text is matched HERE, locally, and only one of
- * these constants is sent.
- */
+/** How a tool call ended; only these constants leave the machine. */
 export const TOOL_OUTCOMES = [
   "ok",
   "error_auth",
@@ -161,19 +155,14 @@ export const TOOL_OUTCOMES = [
 ] as const;
 export type ToolOutcome = (typeof TOOL_OUTCOMES)[number];
 
-/**
- * The last check before the wire, independent of the callers: a tool_call ships its reason
- * only if it is one of TOOL_OUTCOMES; anything else is dropped here.
- */
+/** Drops a tool_call reason that is not in TOOL_OUTCOMES. */
 function wireReason(event: TelemetryEvent, reason: string | undefined): string | undefined {
   if (event !== "tool_call" || reason === undefined) return reason;
   return (TOOL_OUTCOMES as readonly string[]).includes(reason) ? reason : undefined;
 }
 
-// First match wins, so the order matters: an auth failure often also says "invalid",
-// a rate limit often also says "403". Codes in brackets are Yandex Direct's ("[53] …");
-// Direct answers "no access to this client's account" with the auth code 53, hence the
-// permission line ahead of auth.
+// First match wins. Direct answers "no access to this client" with auth code 53, so that
+// permission line goes before auth.
 const OUTCOME_PATTERNS: ReadonlyArray<readonly [ToolOutcome, RegExp]> = [
   ["error_timeout", /timed?[ _-]?out|таймаут|ETIMEDOUT|AbortError|не был готов|not ready/i],
   ["error_network", /ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|EPIPE|fetch failed|socket hang up/i],
@@ -198,11 +187,7 @@ function resultText(value: unknown): string {
     .join("\n");
 }
 
-/**
- * Classifies a finished call: `toolOutcome(result)` for a returned result,
- * `toolOutcome(undefined, error)` for a thrown one (whatever was thrown, `undefined` included).
- * Reads the result/error text, returns only a TOOL_OUTCOMES constant.
- */
+/** `toolOutcome(result)` for a returned result, `toolOutcome(undefined, error)` for a thrown one. */
 export function toolOutcome(result: unknown, ...thrown: [unknown?]): ToolOutcome {
   const didThrow = thrown.length > 0;
   if (!didThrow && !(result as { isError?: unknown } | null)?.isError) return "ok";
@@ -211,14 +196,7 @@ export function toolOutcome(result: unknown, ...thrown: [unknown?]): ToolOutcome
   return didThrow ? "error_internal" : "error_other";
 }
 
-/**
- * Error excerpt for a failed call — a port of the Ask Ads gateway's journal excerpt. An
- * allowlist: only the HTTP status (+ the text after it), an API code "[8000] …", tags like
- * [HOST_NOT_VERIFIED], error_string/error_detail/error_type/message values and network
- * markers are kept; any other text is dropped. Inside what is kept, e-mails, hosts, URLs,
- * login/password/token values, Bearer, IPs, phones, any 4+ digit run and any quoted text
- * ('…', "…", «…» — names of sheets, files, campaigns) become "#".
- */
+/** Error excerpt: allowlisted fragments of the error text, masked (port of the Ask Ads gateway's). */
 export const DETAIL_MAX = 200;
 const PICK =
   /\bHTTP (?<http>\d{3})\b(?::\s*(?<htext>[^{[]{1,200}))?|^(?:Ошибка: )?\[(?<bcode>\d{1,5})\]\s*(?<btext>[^;(]{1,200})|\[(?<tag>[A-Za-z][A-Za-z_]{2,})\]\s*(?<ttext>[^;(]{0,200})|\berror_code["']?\s*[:=]\s*["']?(?<code>\d{1,5})\b|\b(?<key>error_string|error_detail|error_type|message)["']?\s*[:=]\s*["']?(?<value>[^"'}\]]{1,80})|\b(?<net>ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|timed out|fetch failed|socket hang up|connection closed)\b|(?<netru>превысил таймаут)/gi;
@@ -235,7 +213,6 @@ function scrub(value: string, quoted = true): string {
     .replace(/^[ ;:,.]+|[ ;:,.]+$/g, "");
 }
 
-/** The masked excerpt of an error text, or "" when nothing allowlisted is in it. */
 export function errorDetail(text: string): string {
   const flat = text.slice(0, 2000).split(/\s+/).filter(Boolean).join(" ");
   const parts: string[] = [];
@@ -261,12 +238,7 @@ export function errorDetail(text: string): string {
   return parts.join("; ").slice(0, DETAIL_MAX);
 }
 
-/**
- * Where a failed result came from, kept off the wire: a WeakMap entry on the result object,
- * never serialized to the client or the model. `fail()` notes it: a plain string is our own
- * refusal ("local"), a built-in JS error is a bug in our code ("internal"). Neither shape
- * matches the API-error allowlist above, so without this both would arrive with no excerpt.
- */
+/** Set by fail(), never serialized: our own refusal ("local") or a bug in our code ("internal"). */
 const FAILURE_ORIGIN = new WeakMap<object, { origin: "local" | "internal"; text: string }>();
 const JS_ERRORS = new Set(["TypeError", "ReferenceError", "RangeError", "SyntaxError", "EvalError", "URIError"]);
 
@@ -274,7 +246,6 @@ function jsBug(err: unknown): string | undefined {
   return err instanceof Error && JS_ERRORS.has(err.name) ? `${err.name}: ${err.message.split("\n")[0]}` : undefined;
 }
 
-/** Called by fail(): returns `result` untouched, only remembering its origin for telemetry. */
 export function noteFailure<T>(result: T, err: unknown): T {
   try {
     if (result && typeof result === "object") {
@@ -285,15 +256,12 @@ export function noteFailure<T>(result: T, err: unknown): T {
       }
     }
   } catch {
-    // telemetry bookkeeping never affects the result
+    // never affects the result
   }
   return result;
 }
 
-/**
- * Our own text, masked like any excerpt fragment. A JS error quotes identifiers of our code
- * ("reading 'Campaigns'"), not user data, so its quotes are kept.
- */
+/** A JS error quotes identifiers of our code, not user data, so its quotes are kept. */
 function maskedOwnText(prefix: string, text: string, quoted = true): string {
   return (prefix + scrub(text.split(/\s+/).filter(Boolean).join(" "), quoted)).slice(0, DETAIL_MAX);
 }
@@ -311,24 +279,19 @@ function reportCall(telemetry: Telemetry, tool: string, value: unknown, thrown: 
         reason = "error_internal";
         detail = maskedOwnText("internal: ", bug, false);
       } else if (noted?.origin === "local") {
-        // Our own refusal is always about the request, whatever words its text happens to use.
         reason = "error_invalid_request";
         detail = maskedOwnText("local: ", noted.text);
       } else detail = errorDetail(resultText(value));
     }
     telemetry.send("tool_call", { tool, reason, error_detail: detail || undefined });
   } catch {
-    // a result shaped in a way the classifier did not expect — skip the ping, keep the call
+    // never affects the call
   }
 }
 
 /**
- * Count every tool invocation by name and how it ended. Wraps registerTool once, before the
- * domain modules register their tools, so no per-tool wiring is needed. Only the tool *name*
- * and a TOOL_OUTCOMES constant are recorded, plus errorDetail's masked excerpt for a failed call —
- * arguments, results and any other error text never reach telemetry.
- * The ping goes out when the call finishes. Calls the SDK rejects on input validation never
- * reach the wrapped callback and are not counted.
+ * Counts every tool call by name and outcome. Wraps registerTool once, before the domain
+ * modules register their tools. Calls rejected by SDK input validation are not counted.
  */
 export function instrumentToolCalls(server: McpServer, telemetry: Telemetry): void {
   const original = server.registerTool.bind(server);

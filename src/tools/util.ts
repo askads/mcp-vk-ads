@@ -20,7 +20,7 @@ export function ok(data: unknown): CallToolResult {
   return { content: [{ type: "text", text }] };
 }
 
-/** The failed result; also notes, off the wire, whether it is our own refusal or a JS bug (telemetry). */
+/** Also notes the failure's origin for telemetry (noteFailure). */
 export function fail(err: unknown): CallToolResult {
   return noteFailure(failText(err), err);
 }
