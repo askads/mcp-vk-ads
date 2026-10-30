@@ -7,6 +7,22 @@
 
 ## [Unreleased]
 
+## [1.8.0] — 2026-10-30
+
+### Изменено
+
+- Телеметрия: событие `tool_call` теперь отправляется по завершении вызова и несёт его исход: `ok`
+  или категорию ошибки (`error_auth`, `error_invalid_request` и т. д.). При ошибке к нему
+  добавляется фрагмент текста ошибки до 200 символов: HTTP-статус, код и сообщение API, текст
+  отказа самого сервера или тип и первая строка ошибки в его коде. E-mail, адреса, токены, числа
+  от 4 цифр и текст в кавычках заменяются на «#». Если в тексте ошибки есть значение из запроса,
+  оно тоже может попасть во фрагмент. Отключение прежнее: `ASKADS_TELEMETRY=0`.
+
+### Исправлено
+
+- Телеметрия не может изменить результат вызова: если разбор исхода падает, клиент получает ровно
+  то, что вернул инструмент.
+
 ## [1.7.0] — 2026-10-26
 
 ### Добавлено
@@ -245,7 +261,8 @@
   и lifecycle-действия (activate/stop/delete), статистика, справочники (регионы),
   `raw_request` (escape hatch на любой эндпойнт), пагинация (offset + авто по offset/count).
 
-[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/askads/mcp-vk-ads/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/askads/mcp-vk-ads/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/askads/mcp-vk-ads/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/askads/mcp-vk-ads/compare/v1.5.1...v1.6.0
