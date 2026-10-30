@@ -35,7 +35,10 @@ configuration.
 
 The underlying server sends anonymous technical events by default: a random installation
 identifier, the name of the tool that was called, and the versions of the server, the AI
-app, Node.js and the operating system. Your access token, your account data, tool arguments
+app, Node.js and the operating system.
+For each call it also sends the outcome and, on failure, a short excerpt of the error text with
+e-mails, addresses, tokens, numbers of 4+ digits and quoted text replaced by `#`; a value from
+your request can appear in it if the error text contains it. Your access token, your account data, tool arguments
 and the names and values of environment variables are **not** sent. Set the
 **Anonymous telemetry** option to `0` to turn it off.
 
