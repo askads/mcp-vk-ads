@@ -178,13 +178,17 @@ const OUTCOME_PATTERNS: ReadonlyArray<readonly [ToolOutcome, RegExp]> = [
   ["error_invalid_request", /\b400\b|\b422\b|bad request|invalid|syntax|некоррект|неверн|недопустим|required|обязател|expected|must (?:be|contain|have)|\[(?:4000|4001|4003|5000|8000)\]/i],
 ];
 
+// Inputs are cut before any regex runs: a long argument echoed in an error must not stall the call.
+const TEXT_MAX = 4000;
+
 function resultText(value: unknown): string {
-  if (value instanceof Error) return `${value.name} ${value.message}`;
+  if (value instanceof Error) return `${value.name} ${value.message}`.slice(0, TEXT_MAX);
   const content = (value as { content?: unknown } | null)?.content;
   if (!Array.isArray(content)) return "";
   return content
     .map((part) => (part && typeof part === "object" && typeof part.text === "string" ? part.text : ""))
-    .join("\n");
+    .join("\n")
+    .slice(0, TEXT_MAX);
 }
 
 /** `toolOutcome(result)` for a returned result, `toolOutcome(undefined, error)` for a thrown one. */
@@ -201,14 +205,14 @@ export const DETAIL_MAX = 200;
 const PICK =
   /\bHTTP (?<http>\d{3})\b(?::\s*(?<htext>[^{[]{1,200}))?|^(?:Ошибка: )?\[(?<bcode>\d{1,5})\]\s*(?<btext>[^;(]{1,200})|\[(?<tag>[A-Za-z][A-Za-z_]{2,})\]\s*(?<ttext>[^;(]{0,200})|\berror_code["']?\s*[:=]\s*["']?(?<code>\d{1,5})\b|\b(?<key>error_string|error_detail|error_type|message)["']?\s*[:=]\s*["']?(?<value>[^"'}\]]{1,80})|\b(?<net>ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|timed out|fetch failed|socket hang up|connection closed)\b|(?<netru>превысил таймаут)/gi;
 const SCRUB =
-  /(?<key>(?:login|password|secret|token|api[_-]?key|authorization)\s*[:=]\s*["']?|(?:bearer|basic)\s+)(?<val>[^,;]+)|[^\s,;]*(?:@|:\/\/|%3A|\p{L}\.\p{L})[^\s,;]*|\b(?:y0_|AQAA)\S+|\+?\d(?:[\s().-]*\d){3,}/giu;
+  /(?<key>(?:login|password|secret|token|api[_-]?key|authorization)\s*[:=]\s*["']?|(?:bearer|basic)\s+)(?<val>[^,;]+)|[^\s,;]*(?:@|:\/\/|%3A|\p{L}\.\p{L})[^\s,;]*|(?<key2>\b(?:token|secret|password|api[_-]?key)\s+)(?=\S*[\d_-])\S{8,}|\b(?:y0_|AQAA|AQVN|t1\.|sk-|vk1\.|vk_|ghp_|ya29\.)\S+|\b(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[\w-]{20,}\b|\+?\d(?:[\s().-]*\d){3,}/giu;
 const QUOTED = /(?<!\p{L})'[^'\n]{1,200}'(?!\p{L})|"[^"\n]{1,200}"|«[^»]{1,200}»/gu;
 
 function scrub(value: string, quoted = true): string {
   return (quoted ? value.replace(QUOTED, "#") : value)
     .replace(SCRUB, (...args) => {
-      const groups = args[args.length - 1] as { key?: string };
-      return (groups.key ?? "") + "#";
+      const groups = args[args.length - 1] as { key?: string; key2?: string };
+      return (groups.key ?? groups.key2 ?? "") + "#";
     })
     .replace(/^[ ;:,.]+|[ ;:,.]+$/g, "");
 }
@@ -263,7 +267,7 @@ export function noteFailure<T>(result: T, err: unknown): T {
 
 /** A JS error quotes identifiers of our code, not user data, so its quotes are kept. */
 function maskedOwnText(prefix: string, text: string, quoted = true): string {
-  return (prefix + scrub(text.split(/\s+/).filter(Boolean).join(" "), quoted)).slice(0, DETAIL_MAX);
+  return (prefix + scrub(text.slice(0, 2 * DETAIL_MAX).split(/\s+/).filter(Boolean).join(" "), quoted)).slice(0, DETAIL_MAX);
 }
 
 /** Best effort: classifying or sending must never change what the tool returns or throws. */

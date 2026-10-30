@@ -468,3 +468,30 @@ test("noteFailure returns the very same result object and adds nothing to it", (
   assert.equal(JSON.stringify(result), before);
   assert.deepEqual(Object.keys(result), ["isError", "content"]);
 });
+
+test("errorDetail masks bare tokens and stays fast on huge echoed input", () => {
+  for (const [text, leak] of [
+    ["HTTP 401: invalid OAuth token vk_live_ABCdefGHIjkl", "vk_live"],
+    ["HTTP 401: token AQVNabcdefghijkl expired", "AQVN"],
+    ["HTTP 500: key sk-live-abcdef rejected", "sk-live"],
+    ["HTTP 400: bad id a1b2c3d4e5f6g7h8i9j0k1l2", "a1b2c3d4e5"],
+  ] as const) {
+    assert.ok(!errorDetail(text).includes(leak), `${leak}: ${errorDetail(text)}`);
+  }
+  const started = Date.now();
+  errorDetail("HTTP 400: " + "a".repeat(200_000) + "@x");
+  errorDetail("x".repeat(200_000));
+  assert.ok(Date.now() - started < 200, "regexes must not go quadratic");
+});
+
+test("a huge argument echoed in our own refusal does not stall the call", async () => {
+  const { mcp, sent } = await pairWith((server) =>
+    server.registerTool("refuse", { description: "r", inputSchema: {} }, async () =>
+      failLike(`${"a".repeat(200_000)}goal#: вместо # нужен идентификатор цели`),
+    ),
+  );
+  const started = Date.now();
+  await mcp.callTool({ name: "refuse", arguments: {} });
+  assert.ok(Date.now() - started < 500);
+  assert.ok(String(sent.find((s) => s.body.event === "tool_call")!.body.error_detail).length <= DETAIL_MAX);
+});
