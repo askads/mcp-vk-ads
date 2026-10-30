@@ -495,3 +495,15 @@ test("a huge argument echoed in our own refusal does not stall the call", async 
   assert.ok(Date.now() - started < 500);
   assert.ok(String(sent.find((s) => s.body.event === "tool_call")!.body.error_detail).length <= DETAIL_MAX);
 });
+
+test("errorDetail masks long quotes and any value after a secret key", () => {
+  for (const [text, leak] of [
+    [`HTTP 400: unknown method '${"PRIVATECONTENT".repeat(30)}'`, "PRIVATECONTENT"],
+    [`HTTP 400: unknown method '${"PRIVATECONTENT".repeat(30)}`, "PRIVATECONTENT"],
+    ["HTTP 401: Api-Key SECRETKEY invalid", "SECRETKEY"],
+    ["HTTP 401: token abcdefghijklmnopqrstuvwxyz expired", "abcdefghij"],
+  ] as const) {
+    assert.ok(!errorDetail(text).includes(leak), errorDetail(text));
+  }
+  assert.equal(errorDetail("HTTP 401: token expired"), "HTTP 401 token expired");
+});

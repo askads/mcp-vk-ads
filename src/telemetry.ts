@@ -205,8 +205,8 @@ export const DETAIL_MAX = 200;
 const PICK =
   /\bHTTP (?<http>\d{3})\b(?::\s*(?<htext>[^{[]{1,200}))?|^(?:Ошибка: )?\[(?<bcode>\d{1,5})\]\s*(?<btext>[^;(]{1,200})|\[(?<tag>[A-Za-z][A-Za-z_]{2,})\]\s*(?<ttext>[^;(]{0,200})|\berror_code["']?\s*[:=]\s*["']?(?<code>\d{1,5})\b|\b(?<key>error_string|error_detail|error_type|message)["']?\s*[:=]\s*["']?(?<value>[^"'}\]]{1,80})|\b(?<net>ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|timed out|fetch failed|socket hang up|connection closed)\b|(?<netru>превысил таймаут)/gi;
 const SCRUB =
-  /(?<key>(?:login|password|secret|token|api[_-]?key|authorization)\s*[:=]\s*["']?|(?:bearer|basic)\s+)(?<val>[^,;]+)|[^\s,;]*(?:@|:\/\/|%3A|\p{L}\.\p{L})[^\s,;]*|(?<key2>\b(?:token|secret|password|api[_-]?key)\s+)(?=\S*[\d_-])\S{8,}|\b(?:y0_|AQAA|AQVN|t1\.|sk-|vk1\.|vk_|ghp_|ya29\.)\S+|\b(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[\w-]{20,}\b|\+?\d(?:[\s().-]*\d){3,}/giu;
-const QUOTED = /(?<!\p{L})'[^'\n]{1,200}'(?!\p{L})|"[^"\n]{1,200}"|«[^»]{1,200}»/gu;
+  /(?<key>(?:login|password|secret|token|api[_-]?key|authorization)\s*[:=]\s*["']?|(?:bearer|basic)\s+)(?<val>[^,;]+)|[^\s,;]*(?:@|:\/\/|%3A|\p{L}\.\p{L})[^\s,;]*|(?<key2>\b(?:token|secret|password|api[_-]?key|access_token|refresh_token|client_secret)\s+)(?!(?:expired|invalid|is|was|for|has|not|missing|required|revoked|provided|type)\b)\S+|\b(?:y0_|AQAA|AQVN|t1\.|sk-|vk1\.|vk_|ghp_|ya29\.)\S+|\b(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[\w-]{20,}\b|\+?\d(?:[\s().-]*\d){3,}/giu;
+const QUOTED = /(?<!\p{L})'[^'\n]+(?:'(?!\p{L})|$)|"[^"\n]+(?:"|$)|«[^»]+(?:»|$)/gu;
 
 function scrub(value: string, quoted = true): string {
   return (quoted ? value.replace(QUOTED, "#") : value)
