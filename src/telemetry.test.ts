@@ -9,7 +9,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
-import { instrumentToolCalls, Telemetry, telemetryEnabled, DETAIL_MAX, errorDetail, TOOL_OUTCOMES, toolOutcome } from "./telemetry.js";
+import { instrumentToolCalls, Telemetry, telemetryEnabled, DETAIL_MAX, errorDetail, noteFailure, TOOL_OUTCOMES, toolOutcome } from "./telemetry.js";
 
 interface Sent {
   url: string;
@@ -388,4 +388,83 @@ test("a failed tool_call carries the masked excerpt, a successful one none", asy
   assert.equal(calls[0].body.error_detail, "code=8000 Некорректный запрос для #, кампания #");
   assert.equal(calls[1].body.error_detail, undefined);
   assert.ok(!JSON.stringify(calls).includes("hunter2"));
+});
+
+// --- excerpt: quoted text, full fragments, our own refusals and JS bugs ------------------
+
+test("errorDetail masks quoted text — names of sheets, files, campaigns", () => {
+  const detail = errorDetail("HTTP 400: [INVALID_ARGUMENT] Invalid range for sheet 'Зарплаты Q3' in «Бюджет 2026» and \"Отчёт\"");
+  for (const leak of ["Зарплаты", "Бюджет", "Отчёт"]) assert.ok(!detail.includes(leak), detail);
+  assert.ok(errorDetail("HTTP 400: This attribute can't be a dimension, value: VisitID").includes("can't be a dimension"));
+});
+
+test("errorDetail keeps the fragment up to 200 chars, not cut mid-sentence at 100", () => {
+  const detail = errorDetail(
+    "Ошибка: HTTP 400: invalid_parameter: Metrics and dimensions with different prefixes can be used together only when filtering data, value: ym:pv:URLPath is incompatible with ym:s:visits, error code: 4011",
+  );
+  assert.match(detail, /ym:pv:URLPath is incompatible/);
+});
+
+async function pairWith(register: (server: McpServer) => void) {
+  const sent: Sent[] = [];
+  const server = new McpServer({ name: "test-server", version: "0.0.0" });
+  instrumentToolCalls(server, new Telemetry("1.0.0", true, recordingFetch(sent)));
+  register(server);
+  const mcp = new Client({ name: "test-client", version: "9.9.9" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  await mcp.connect(clientTransport);
+  return { mcp, sent };
+}
+
+const failLike = (err: unknown) =>
+  noteFailure({ isError: true, content: [{ type: "text" as const, text: `Ошибка: ${err instanceof Error ? err.message : String(err)}` }] }, err);
+
+test("our own refusal arrives as local: with masked text and a request outcome", async () => {
+  const { mcp, sent } = await pairWith((server) =>
+    server.registerTool("refuse", { description: "r", inputSchema: {} }, async () =>
+      failLike("Нужен хотя бы один фильтр: campaignIds для «Кампания Иванова», лимит 12345"),
+    ),
+  );
+  const res = await mcp.callTool({ name: "refuse", arguments: {} });
+  assert.match(JSON.stringify(res), /Кампания Иванова/, "the client still gets the full text");
+  const call = sent.find((s) => s.body.event === "tool_call")!;
+  assert.equal(call.body.reason, "error_invalid_request");
+  assert.equal(call.body.error_detail, "local: Нужен хотя бы один фильтр: campaignIds для #, лимит #");
+});
+
+test("a JS bug caught by fail() arrives as error_internal with its type and first line", async () => {
+  const { mcp, sent } = await pairWith((server) =>
+    server.registerTool("bug", { description: "b", inputSchema: {} }, async () => {
+      try {
+        (undefined as unknown as { Campaigns: unknown }).Campaigns;
+        return { content: [] };
+      } catch (e) {
+        return failLike(e);
+      }
+    }),
+  );
+  await mcp.callTool({ name: "bug", arguments: {} });
+  const call = sent.find((s) => s.body.event === "tool_call")!;
+  assert.equal(call.body.reason, "error_internal");
+  assert.match(String(call.body.error_detail), /^internal: TypeError: .*Campaigns/);
+});
+
+test("a thrown JS bug is reported the same way", async () => {
+  const { mcp, sent } = await pairWith((server) =>
+    server.registerTool("throws", { description: "t", inputSchema: {} }, async () => {
+      throw new RangeError("Invalid array length\n    at secret/path.ts:1");
+    }),
+  );
+  await mcp.callTool({ name: "throws", arguments: {} });
+  const call = sent.find((s) => s.body.event === "tool_call")!;
+  assert.equal(call.body.error_detail, "internal: RangeError: Invalid array length");
+});
+
+test("noteFailure returns the very same result object and adds nothing to it", () => {
+  const result = { isError: true, content: [{ type: "text" as const, text: "x" }] };
+  const before = JSON.stringify(result);
+  assert.equal(noteFailure(result, "x"), result);
+  assert.equal(JSON.stringify(result), before);
+  assert.deepEqual(Object.keys(result), ["isError", "content"]);
 });

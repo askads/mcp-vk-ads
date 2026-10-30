@@ -216,16 +216,18 @@ export function toolOutcome(result: unknown, ...thrown: [unknown?]): ToolOutcome
  * allowlist: only the HTTP status (+ the text after it), an API code "[8000] …", tags like
  * [HOST_NOT_VERIFIED], error_string/error_detail/error_type/message values and network
  * markers are kept; any other text is dropped. Inside what is kept, e-mails, hosts, URLs,
- * login/password/token values, Bearer, IPs, phones and any 4+ digit run become "#".
+ * login/password/token values, Bearer, IPs, phones, any 4+ digit run and any quoted text
+ * ('…', "…", «…» — names of sheets, files, campaigns) become "#".
  */
 export const DETAIL_MAX = 200;
 const PICK =
-  /\bHTTP (?<http>\d{3})\b(?::\s*(?<htext>[^{[]{1,100}))?|^(?:Ошибка: )?\[(?<bcode>\d{1,5})\]\s*(?<btext>[^;(]{1,120})|\[(?<tag>[A-Za-z][A-Za-z_]{2,})\]\s*(?<ttext>[^;(]{0,100})|\berror_code["']?\s*[:=]\s*["']?(?<code>\d{1,5})\b|\b(?<key>error_string|error_detail|error_type|message)["']?\s*[:=]\s*["']?(?<value>[^"'}\]]{1,80})|\b(?<net>ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|timed out|fetch failed|socket hang up|connection closed)\b|(?<netru>превысил таймаут)/gi;
+  /\bHTTP (?<http>\d{3})\b(?::\s*(?<htext>[^{[]{1,200}))?|^(?:Ошибка: )?\[(?<bcode>\d{1,5})\]\s*(?<btext>[^;(]{1,200})|\[(?<tag>[A-Za-z][A-Za-z_]{2,})\]\s*(?<ttext>[^;(]{0,200})|\berror_code["']?\s*[:=]\s*["']?(?<code>\d{1,5})\b|\b(?<key>error_string|error_detail|error_type|message)["']?\s*[:=]\s*["']?(?<value>[^"'}\]]{1,80})|\b(?<net>ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|timed out|fetch failed|socket hang up|connection closed)\b|(?<netru>превысил таймаут)/gi;
 const SCRUB =
   /(?<key>(?:login|password|secret|token|api[_-]?key|authorization)\s*[:=]\s*["']?|(?:bearer|basic)\s+)(?<val>[^,;]+)|[^\s,;]*(?:@|:\/\/|%3A|\p{L}\.\p{L})[^\s,;]*|\b(?:y0_|AQAA)\S+|\+?\d(?:[\s().-]*\d){3,}/giu;
+const QUOTED = /(?<!\p{L})'[^'\n]{1,200}'(?!\p{L})|"[^"\n]{1,200}"|«[^»]{1,200}»/gu;
 
-function scrub(value: string): string {
-  return value
+function scrub(value: string, quoted = true): string {
+  return (quoted ? value.replace(QUOTED, "#") : value)
     .replace(SCRUB, (...args) => {
       const groups = args[args.length - 1] as { key?: string };
       return (groups.key ?? "") + "#";
@@ -259,12 +261,61 @@ export function errorDetail(text: string): string {
   return parts.join("; ").slice(0, DETAIL_MAX);
 }
 
+/**
+ * Where a failed result came from, kept off the wire: a WeakMap entry on the result object,
+ * never serialized to the client or the model. `fail()` notes it: a plain string is our own
+ * refusal ("local"), a built-in JS error is a bug in our code ("internal"). Neither shape
+ * matches the API-error allowlist above, so without this both would arrive with no excerpt.
+ */
+const FAILURE_ORIGIN = new WeakMap<object, { origin: "local" | "internal"; text: string }>();
+const JS_ERRORS = new Set(["TypeError", "ReferenceError", "RangeError", "SyntaxError", "EvalError", "URIError"]);
+
+function jsBug(err: unknown): string | undefined {
+  return err instanceof Error && JS_ERRORS.has(err.name) ? `${err.name}: ${err.message.split("\n")[0]}` : undefined;
+}
+
+/** Called by fail(): returns `result` untouched, only remembering its origin for telemetry. */
+export function noteFailure<T>(result: T, err: unknown): T {
+  try {
+    if (result && typeof result === "object") {
+      if (typeof err === "string") FAILURE_ORIGIN.set(result, { origin: "local", text: err });
+      else {
+        const bug = jsBug(err);
+        if (bug) FAILURE_ORIGIN.set(result, { origin: "internal", text: bug });
+      }
+    }
+  } catch {
+    // telemetry bookkeeping never affects the result
+  }
+  return result;
+}
+
+/**
+ * Our own text, masked like any excerpt fragment. A JS error quotes identifiers of our code
+ * ("reading 'Campaigns'"), not user data, so its quotes are kept.
+ */
+function maskedOwnText(prefix: string, text: string, quoted = true): string {
+  return (prefix + scrub(text.split(/\s+/).filter(Boolean).join(" "), quoted)).slice(0, DETAIL_MAX);
+}
+
 /** Best effort: classifying or sending must never change what the tool returns or throws. */
 function reportCall(telemetry: Telemetry, tool: string, value: unknown, thrown: boolean): void {
   if (!telemetry.isEnabled()) return;
   try {
-    const reason = thrown ? toolOutcome(undefined, value) : toolOutcome(value);
-    const detail = reason === "ok" ? "" : errorDetail(resultText(value));
+    let reason = thrown ? toolOutcome(undefined, value) : toolOutcome(value);
+    let detail = "";
+    if (reason !== "ok") {
+      const noted = value && typeof value === "object" ? FAILURE_ORIGIN.get(value) : undefined;
+      const bug = noted?.origin === "internal" ? noted.text : thrown ? jsBug(value) : undefined;
+      if (bug) {
+        reason = "error_internal";
+        detail = maskedOwnText("internal: ", bug, false);
+      } else if (noted?.origin === "local") {
+        // Our own refusal is always about the request, whatever words its text happens to use.
+        reason = "error_invalid_request";
+        detail = maskedOwnText("local: ", noted.text);
+      } else detail = errorDetail(resultText(value));
+    }
     telemetry.send("tool_call", { tool, reason, error_detail: detail || undefined });
   } catch {
     // a result shaped in a way the classifier did not expect — skip the ping, keep the call

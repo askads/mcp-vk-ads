@@ -1,6 +1,7 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { VkAdsClient } from "../client.js";
+import { noteFailure } from "../telemetry.js";
 
 /**
  * A date in YYYY-MM-DD form, validated before the request reaches the API.
@@ -19,7 +20,12 @@ export function ok(data: unknown): CallToolResult {
   return { content: [{ type: "text", text }] };
 }
 
+/** The failed result; also notes, off the wire, whether it is our own refusal or a JS bug (telemetry). */
 export function fail(err: unknown): CallToolResult {
+  return noteFailure(failText(err), err);
+}
+
+function failText(err: unknown): CallToolResult {
   const message = err instanceof Error ? err.message : String(err);
   return { content: [{ type: "text", text: `Ошибка: ${message}` }], isError: true };
 }
