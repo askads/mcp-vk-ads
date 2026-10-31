@@ -261,12 +261,28 @@ type NetworkFailure = { reason: ToolOutcome; text: string };
 /** Set by fail(), never serialized: our own refusal ("local"), a bug in our code ("internal") or a failed fetch ("network"). */
 const FAILURE_ORIGIN = new WeakMap<
   object,
-  { origin: "local" | "internal"; text: string } | ({ origin: "network" } & NetworkFailure)
+  { origin: "local" | "internal" | "error"; text: string } | ({ origin: "network" } & NetworkFailure)
 >();
 const JS_ERRORS = new Set(["TypeError", "ReferenceError", "RangeError", "SyntaxError", "EvalError", "URIError"]);
 
 function jsBug(err: unknown): string | undefined {
-  return err instanceof Error && JS_ERRORS.has(err.name) ? `${err.name}: ${err.message.split("\n")[0]}` : undefined;
+  if (!(err instanceof Error) || !JS_ERRORS.has(err.name)) return undefined;
+  // Node's own errors (ERR_INVALID_ARG_TYPE …, system errors) quote the values passed in: their code only.
+  const code: unknown = (err as { code?: unknown }).code;
+  if (code !== undefined || "errno" in err || "syscall" in err) {
+    return typeof code === "string" && /^[A-Z][A-Z0-9_]{2,40}$/.test(code) ? `${err.name} ${code}` : err.name;
+  }
+  return `${err.name}: ${err.message.split("\n")[0]}`;
+}
+
+/**
+ * Only the class name of this server's own errors (AuthRequiredError, AbortError), used when the
+ * allowlist finds nothing. Never the message: a plain Error or a system error (ENOENT …) can carry
+ * user data, so those send nothing.
+ */
+function errorText(err: unknown): string | undefined {
+  if (!(err instanceof Error) || "errno" in err || "syscall" in err) return undefined;
+  return /^[A-Z][A-Za-z0-9]*(?:Error|Exception)$/.test(err.name) && err.name !== "Error" ? err.name : undefined;
 }
 
 /**
@@ -293,7 +309,8 @@ export function noteFailure<T>(result: T, err: unknown): T {
       else if (net) FAILURE_ORIGIN.set(result, { origin: "network", ...net });
       else {
         const bug = jsBug(err);
-        if (bug) FAILURE_ORIGIN.set(result, { origin: "internal", text: bug });
+        const text = bug ?? errorText(err);
+        if (text) FAILURE_ORIGIN.set(result, { origin: bug ? "internal" : "error", text });
       }
     }
   } catch {
@@ -326,7 +343,15 @@ function reportCall(telemetry: Telemetry, tool: string, value: unknown, thrown: 
       } else if (noted?.origin === "local") {
         reason = "error_invalid_request";
         detail = maskedOwnText("local: ", noted.text);
-      } else detail = errorDetail(resultText(value));
+      } else {
+        detail = errorDetail(resultText(value));
+        const own = noted?.origin === "error" ? noted.text : thrown ? errorText(value) : undefined;
+        if (!detail && own) {
+          detail = own;
+          // The class name ("AuthRequiredError") often says more than the message.
+          if (reason === "error_other") reason = toolOutcome({ isError: true, content: [{ type: "text", text: own }] });
+        }
+      }
     }
     telemetry.send("tool_call", { tool, reason, error_detail: detail || undefined });
   } catch {
