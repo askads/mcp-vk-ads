@@ -596,3 +596,41 @@ test("errorDetail masks long quotes and any value after a secret key", () => {
   }
   assert.equal(errorDetail("HTTP 401: token expired"), "HTTP 401 token expired");
 });
+
+// --- this server's own error classes: text when the allowlist finds nothing ----------
+
+class OwnError extends Error {
+  constructor(name: string, message: string) {
+    super(message);
+    this.name = name;
+  }
+}
+
+test("our own error class without an allowlisted fragment arrives with its masked text", async () => {
+  const { mcp, sent } = await pairWith((server) => {
+    server.registerTool("auth", { description: "a", inputSchema: {} }, async () =>
+      failLike(new OwnError("AuthRequiredError", "Не настроено подключение: вызовите start_login (boss@example.com)")),
+    );
+    server.registerTool("down", { description: "d", inputSchema: {} }, async () => {
+      throw new OwnError("DirectUnavailableError", "API недоступен: на запрос «AccountManagement» пришёл пустой ответ");
+    });
+  });
+  await mcp.callTool({ name: "auth", arguments: {} });
+  await mcp.callTool({ name: "down", arguments: {} });
+  const [auth, down] = sent.filter((s) => s.body.event === "tool_call");
+  assert.equal(auth.body.reason, "error_auth");
+  assert.equal(auth.body.error_detail, "AuthRequiredError: Не настроено подключение: вызовите start_login #");
+  assert.equal(down.body.reason, "error_upstream");
+  assert.equal(down.body.error_detail, "DirectUnavailableError: API недоступен: на запрос # пришёл пустой ответ");
+});
+
+test("an allowlisted fragment still wins over the error class text", async () => {
+  const { mcp, sent } = await pairWith((server) =>
+    server.registerTool("api", { description: "a", inputSchema: {} }, async () =>
+      failLike(new OwnError("YandexDirectError", "[53] Ошибка авторизации: Недействительный OAuth-токен")),
+    ),
+  );
+  await mcp.callTool({ name: "api", arguments: {} });
+  const call = sent.find((s) => s.body.event === "tool_call")!;
+  assert.equal(call.body.error_detail, "code=53 Ошибка авторизации: Недействительный OAuth-токен");
+});

@@ -261,12 +261,17 @@ type NetworkFailure = { reason: ToolOutcome; text: string };
 /** Set by fail(), never serialized: our own refusal ("local"), a bug in our code ("internal") or a failed fetch ("network"). */
 const FAILURE_ORIGIN = new WeakMap<
   object,
-  { origin: "local" | "internal"; text: string } | ({ origin: "network" } & NetworkFailure)
+  { origin: "local" | "internal" | "error"; text: string } | ({ origin: "network" } & NetworkFailure)
 >();
 const JS_ERRORS = new Set(["TypeError", "ReferenceError", "RangeError", "SyntaxError", "EvalError", "URIError"]);
 
 function jsBug(err: unknown): string | undefined {
   return err instanceof Error && JS_ERRORS.has(err.name) ? `${err.name}: ${err.message.split("\n")[0]}` : undefined;
+}
+
+/** Any other Error, e.g. this server's own error classes: used only when the allowlist finds nothing. */
+function errorText(err: unknown): string | undefined {
+  return err instanceof Error ? `${err.name}: ${err.message.split("\n")[0]}` : undefined;
 }
 
 /**
@@ -293,7 +298,8 @@ export function noteFailure<T>(result: T, err: unknown): T {
       else if (net) FAILURE_ORIGIN.set(result, { origin: "network", ...net });
       else {
         const bug = jsBug(err);
-        if (bug) FAILURE_ORIGIN.set(result, { origin: "internal", text: bug });
+        const text = bug ?? errorText(err);
+        if (text) FAILURE_ORIGIN.set(result, { origin: bug ? "internal" : "error", text });
       }
     }
   } catch {
@@ -326,7 +332,15 @@ function reportCall(telemetry: Telemetry, tool: string, value: unknown, thrown: 
       } else if (noted?.origin === "local") {
         reason = "error_invalid_request";
         detail = maskedOwnText("local: ", noted.text);
-      } else detail = errorDetail(resultText(value));
+      } else {
+        detail = errorDetail(resultText(value));
+        const own = noted?.origin === "error" ? noted.text : thrown ? errorText(value) : undefined;
+        if (!detail && own) {
+          detail = maskedOwnText("", own);
+          // The class name ("AuthRequiredError") often says more than the message.
+          if (reason === "error_other") reason = toolOutcome({ isError: true, content: [{ type: "text", text: own }] });
+        }
+      }
     }
     telemetry.send("tool_call", { tool, reason, error_detail: detail || undefined });
   } catch {
