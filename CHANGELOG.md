@@ -5,6 +5,15 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
 проект придерживается [семантического версионирования](https://semver.org/lang/ru/).
 
+## [1.8.2] - 2026-10-31
+
+### Fixed
+
+- Telemetry: when the error excerpt finds nothing, the server's own error classes
+  (`AuthRequiredError`, `AbortError`, …) send their class name, never the message; a plain `Error`
+  and system errors send nothing. Node errors with a `code`, `errno` or `syscall` send only their type
+  and code. Such failures used to arrive with no text.
+
 ## [Unreleased]
 
 ## [1.8.1] — 2026-10-31
@@ -272,6 +281,7 @@
   `raw_request` (escape hatch на любой эндпойнт), пагинация (offset + авто по offset/count).
 
 [Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.8.1...HEAD
+[1.8.2]: https://github.com/askads/mcp-vk-ads/compare/v1.8.1...v1.8.2
 [1.8.1]: https://github.com/askads/mcp-vk-ads/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/askads/mcp-vk-ads/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/askads/mcp-vk-ads/compare/v1.6.1...v1.7.0
