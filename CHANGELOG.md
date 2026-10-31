@@ -7,6 +7,16 @@
 
 ## [Unreleased]
 
+## [1.8.1] — 2026-10-31
+
+### Исправлено
+
+- Телеметрия: исход ошибки определяется сначала по коду API в начале сообщения, а текстовые
+  шаблоны применяются, только если кода нет. Ошибка 8000 со списком полей, где есть
+  `ForbiddenPlatform`, считалась отказом в доступе.
+- Телеметрия: сетевой сбой `fetch failed` считается ошибкой сети или таймаутом, а не багом
+  сервера.
+
 ## [1.8.0] — 2026-10-30
 
 ### Изменено
@@ -261,7 +271,8 @@
   и lifecycle-действия (activate/stop/delete), статистика, справочники (регионы),
   `raw_request` (escape hatch на любой эндпойнт), пагинация (offset + авто по offset/count).
 
-[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.8.1...HEAD
+[1.8.1]: https://github.com/askads/mcp-vk-ads/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/askads/mcp-vk-ads/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/askads/mcp-vk-ads/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/askads/mcp-vk-ads/compare/v1.6.0...v1.6.1
