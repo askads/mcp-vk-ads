@@ -269,9 +269,14 @@ function jsBug(err: unknown): string | undefined {
   return err instanceof Error && JS_ERRORS.has(err.name) ? `${err.name}: ${err.message.split("\n")[0]}` : undefined;
 }
 
-/** Any other Error, e.g. this server's own error classes: used only when the allowlist finds nothing. */
+/**
+ * Only the class name of this server's own errors (AuthRequiredError, AbortError), used when the
+ * allowlist finds nothing. Never the message: a plain Error or a system error (ENOENT …) can carry
+ * user data, so those send nothing.
+ */
 function errorText(err: unknown): string | undefined {
-  return err instanceof Error ? `${err.name}: ${err.message.split("\n")[0]}` : undefined;
+  if (!(err instanceof Error) || "errno" in err || "syscall" in err) return undefined;
+  return /^[A-Z][A-Za-z0-9]*(?:Error|Exception)$/.test(err.name) && err.name !== "Error" ? err.name : undefined;
 }
 
 /**
@@ -336,7 +341,7 @@ function reportCall(telemetry: Telemetry, tool: string, value: unknown, thrown: 
         detail = errorDetail(resultText(value));
         const own = noted?.origin === "error" ? noted.text : thrown ? errorText(value) : undefined;
         if (!detail && own) {
-          detail = maskedOwnText("", own);
+          detail = own;
           // The class name ("AuthRequiredError") often says more than the message.
           if (reason === "error_other") reason = toolOutcome({ isError: true, content: [{ type: "text", text: own }] });
         }
