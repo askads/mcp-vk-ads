@@ -178,6 +178,18 @@ const OUTCOME_PATTERNS: ReadonlyArray<readonly [ToolOutcome, RegExp]> = [
   ["error_invalid_request", /\b400\b|\b422\b|bad request|invalid|syntax|некоррект|неверн|недопустим|required|обязател|expected|must (?:be|contain|have)|\[(?:4000|4001|4003|5000|8000)\]/i],
 ];
 
+// An API code at the head of the message wins over the text, which may quote field names
+// ("ForbiddenPlatform" in a [8000] list of allowed values). 53 is absent: the text tells a
+// dead token from no access to a client.
+const CODE_OUTCOMES = new Map<string, ToolOutcome>([
+  ...["56", "152", "506", "9000"].map((c) => [c, "error_rate_limit"] as const),
+  ...["54", "3228"].map((c) => [c, "error_permission"] as const),
+  ["8800", "error_not_found"],
+  ...["52", "1000", "1001", "1002"].map((c) => [c, "error_upstream"] as const),
+  ...["4000", "4001", "4003", "5000", "8000"].map((c) => [c, "error_invalid_request"] as const),
+]);
+const LEADING_CODE = /^[^[\n]{0,60}\[(\d{1,5})\]/;
+
 // Inputs are cut before any regex runs: a long argument echoed in an error must not stall the call.
 const TEXT_MAX = 4000;
 
@@ -196,6 +208,8 @@ export function toolOutcome(result: unknown, ...thrown: [unknown?]): ToolOutcome
   const didThrow = thrown.length > 0;
   if (!didThrow && !(result as { isError?: unknown } | null)?.isError) return "ok";
   const text = resultText(didThrow ? thrown[0] : result);
+  const byCode = CODE_OUTCOMES.get(LEADING_CODE.exec(text)?.[1] ?? "");
+  if (byCode) return byCode;
   for (const [outcome, pattern] of OUTCOME_PATTERNS) if (pattern.test(text)) return outcome;
   return didThrow ? "error_internal" : "error_other";
 }
@@ -242,18 +256,41 @@ export function errorDetail(text: string): string {
   return parts.join("; ").slice(0, DETAIL_MAX);
 }
 
-/** Set by fail(), never serialized: our own refusal ("local") or a bug in our code ("internal"). */
-const FAILURE_ORIGIN = new WeakMap<object, { origin: "local" | "internal"; text: string }>();
+type NetworkFailure = { reason: ToolOutcome; text: string };
+
+/** Set by fail(), never serialized: our own refusal ("local"), a bug in our code ("internal") or a failed fetch ("network"). */
+const FAILURE_ORIGIN = new WeakMap<
+  object,
+  { origin: "local" | "internal"; text: string } | ({ origin: "network" } & NetworkFailure)
+>();
 const JS_ERRORS = new Set(["TypeError", "ReferenceError", "RangeError", "SyntaxError", "EvalError", "URIError"]);
 
 function jsBug(err: unknown): string | undefined {
   return err instanceof Error && JS_ERRORS.has(err.name) ? `${err.name}: ${err.message.split("\n")[0]}` : undefined;
 }
 
+/**
+ * Node's fetch rejects a network failure as TypeError("fetch failed") with the socket/DNS/TLS error
+ * in `cause`. Only cause.code leaves the machine: cause.message names hosts and addresses.
+ */
+function fetchFailure(err: unknown): NetworkFailure | undefined {
+  if (!(err instanceof Error) || err.name !== "TypeError" || err.message !== "fetch failed") return undefined;
+  const cause: unknown = err.cause;
+  if (!cause || typeof cause !== "object") return undefined;
+  const raw = (cause as { code?: unknown }).code;
+  const code = typeof raw === "string" && /^[A-Z][A-Z0-9_]{2,40}$/.test(raw) ? raw : "";
+  return {
+    reason: /TIMEOUT|TIMEDOUT/.test(code) ? "error_timeout" : "error_network",
+    text: code ? `fetch failed; ${code.toLowerCase()}` : "fetch failed",
+  };
+}
+
 export function noteFailure<T>(result: T, err: unknown): T {
   try {
     if (result && typeof result === "object") {
+      const net = fetchFailure(err);
       if (typeof err === "string") FAILURE_ORIGIN.set(result, { origin: "local", text: err });
+      else if (net) FAILURE_ORIGIN.set(result, { origin: "network", ...net });
       else {
         const bug = jsBug(err);
         if (bug) FAILURE_ORIGIN.set(result, { origin: "internal", text: bug });
@@ -278,8 +315,12 @@ function reportCall(telemetry: Telemetry, tool: string, value: unknown, thrown: 
     let detail = "";
     if (reason !== "ok") {
       const noted = value && typeof value === "object" ? FAILURE_ORIGIN.get(value) : undefined;
+      const net = noted?.origin === "network" ? noted : thrown ? fetchFailure(value) : undefined;
       const bug = noted?.origin === "internal" ? noted.text : thrown ? jsBug(value) : undefined;
-      if (bug) {
+      if (net) {
+        reason = net.reason;
+        detail = net.text;
+      } else if (bug) {
         reason = "error_internal";
         detail = maskedOwnText("internal: ", bug, false);
       } else if (noted?.origin === "local") {

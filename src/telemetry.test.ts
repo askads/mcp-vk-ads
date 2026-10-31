@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createServer } from "node:net";
+import type { AddressInfo } from "node:net";
 import { z } from "zod";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -10,6 +12,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
 import { instrumentToolCalls, Telemetry, telemetryEnabled, DETAIL_MAX, errorDetail, noteFailure, TOOL_OUTCOMES, toolOutcome } from "./telemetry.js";
+import { fail } from "./tools/util.js";
 
 interface Sent {
   url: string;
@@ -251,6 +254,20 @@ test("Direct's 'no access to this client' is a permission outcome, not auth", ()
   );
 });
 
+test("an API code at the head beats words quoted in the text", () => {
+  // Real clients.get answer: the allowed values include ForbiddenPlatform.
+  const text =
+    "[8000] Некорректный запрос: Элемент массива FieldNames содержит неверное значение перечисления, ожидается одно из значений: AccountQuality, Archived, ClientId, ClientInfo, CountryId, CreatedAt, Currency, Grants, Bonuses, Login, Notification, OverdraftSumAvailable, Phone, Representatives, Restrictions, Settings, Type, Subtype, VatRate, ManagedLogins, ForbiddenPlatform, AvailableCampaignTypes, AvailableAdGroupTypes, ProductMode (request_id: 4573631628979678599)";
+  assert.equal(toolOutcome(errorResult(`Ошибка: ${text}`)), "error_invalid_request");
+  const thrown = new Error(text);
+  thrown.name = "YandexDirectError";
+  assert.equal(toolOutcome(undefined, thrown), "error_invalid_request");
+  assert.equal(toolOutcome(errorResult('Ошибка: Ошибка Live v4 "GetBalance": [54] Нет прав, timed out')), "error_permission");
+  // 53 stays with the text; a code past the head still counts through the patterns.
+  assert.equal(toolOutcome(errorResult("Ошибка: [53] Ошибка авторизации: Недействительный OAuth-токен")), "error_auth");
+  assert.equal(toolOutcome(errorResult(`Ошибка: ${"x".repeat(80)} отвечает [56]`)), "error_rate_limit");
+});
+
 test("telemetry never changes what the tool returns or throws", async () => {
   const sent: Sent[] = [];
   const telemetry = new Telemetry("1.0.0", true, recordingFetch(sent));
@@ -459,6 +476,78 @@ test("a thrown JS bug is reported the same way", async () => {
   await mcp.callTool({ name: "throws", arguments: {} });
   const call = sent.find((s) => s.body.event === "tool_call")!;
   assert.equal(call.body.error_detail, "internal: RangeError: Invalid array length");
+});
+
+const fetchFailed = (code: unknown, message: string) =>
+  new TypeError("fetch failed", { cause: Object.assign(new Error(message), { code }) });
+
+test("a failed fetch caught by fail() is a network error, not a bug, and hides the host", async () => {
+  const { mcp, sent } = await pairWith((server) =>
+    server.registerTool("net", { description: "n", inputSchema: {} }, async () =>
+      fail(fetchFailed("ECONNRESET", "read ECONNRESET api.webmaster.yandex.net 10.1.2.3:443")),
+    ),
+  );
+  await mcp.callTool({ name: "net", arguments: {} });
+  const call = sent.find((s) => s.body.event === "tool_call")!;
+  assert.equal(call.body.reason, "error_network");
+  assert.equal(call.body.error_detail, "fetch failed; econnreset");
+});
+
+test("a thrown failed fetch with a timeout cause is error_timeout", async () => {
+  const { mcp, sent } = await pairWith((server) =>
+    server.registerTool("slow", { description: "s", inputSchema: {} }, async () => {
+      throw fetchFailed("UND_ERR_CONNECT_TIMEOUT", "Connect Timeout Error (attempted address: example.com:443)");
+    }),
+  );
+  await mcp.callTool({ name: "slow", arguments: {} });
+  const call = sent.find((s) => s.body.event === "tool_call")!;
+  assert.equal(call.body.reason, "error_timeout");
+  assert.equal(call.body.error_detail, "fetch failed; und_err_connect_timeout");
+});
+
+test("a real refused fetch is classified by its cause code", async () => {
+  const probe = createServer();
+  await new Promise<void>((resolve) => probe.listen(0, "127.0.0.1", resolve));
+  const { port } = probe.address() as AddressInfo;
+  await new Promise((resolve) => probe.close(resolve));
+  const { mcp, sent } = await pairWith((server) =>
+    server.registerTool("refused", { description: "r", inputSchema: {} }, async () => {
+      try {
+        await fetch(`http://127.0.0.1:${port}/`);
+        return { content: [] };
+      } catch (e) {
+        return fail(e);
+      }
+    }),
+  );
+  await mcp.callTool({ name: "refused", arguments: {} });
+  const call = sent.find((s) => s.body.event === "tool_call")!;
+  assert.equal(call.body.reason, "error_network");
+  assert.equal(call.body.error_detail, "fetch failed; econnrefused");
+});
+
+test("only fetch's own TypeError is a network error; other TypeErrors stay internal", async () => {
+  for (const [err, detail] of [
+    [new TypeError("fetch failed"), "internal: TypeError: fetch failed"],
+    [new TypeError("x is not a function", { cause: { code: "ECONNRESET" } }), "internal: TypeError: x is not a function"],
+  ] as const) {
+    const { mcp, sent } = await pairWith((server) =>
+      server.registerTool("bug", { description: "b", inputSchema: {} }, async () => fail(err)),
+    );
+    await mcp.callTool({ name: "bug", arguments: {} });
+    const call = sent.find((s) => s.body.event === "tool_call")!;
+    assert.equal(call.body.reason, "error_internal");
+    assert.equal(call.body.error_detail, detail);
+  }
+  const { mcp, sent } = await pairWith((server) =>
+    server.registerTool("net", { description: "n", inputSchema: {} }, async () =>
+      fail(fetchFailed("getaddrinfo api.example.com", "getaddrinfo ENOTFOUND api.example.com")),
+    ),
+  );
+  await mcp.callTool({ name: "net", arguments: {} });
+  const call = sent.find((s) => s.body.event === "tool_call")!;
+  assert.equal(call.body.reason, "error_network");
+  assert.equal(call.body.error_detail, "fetch failed", "a code that is not a constant is dropped");
 });
 
 test("noteFailure returns the very same result object and adds nothing to it", () => {
