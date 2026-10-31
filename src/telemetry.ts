@@ -266,7 +266,13 @@ const FAILURE_ORIGIN = new WeakMap<
 const JS_ERRORS = new Set(["TypeError", "ReferenceError", "RangeError", "SyntaxError", "EvalError", "URIError"]);
 
 function jsBug(err: unknown): string | undefined {
-  return err instanceof Error && JS_ERRORS.has(err.name) ? `${err.name}: ${err.message.split("\n")[0]}` : undefined;
+  if (!(err instanceof Error) || !JS_ERRORS.has(err.name)) return undefined;
+  // Node's own errors (ERR_INVALID_ARG_TYPE …, system errors) quote the values passed in: their code only.
+  const code: unknown = (err as { code?: unknown }).code;
+  if (code !== undefined || "errno" in err || "syscall" in err) {
+    return typeof code === "string" && /^[A-Z][A-Z0-9_]{2,40}$/.test(code) ? `${err.name} ${code}` : err.name;
+  }
+  return `${err.name}: ${err.message.split("\n")[0]}`;
 }
 
 /**

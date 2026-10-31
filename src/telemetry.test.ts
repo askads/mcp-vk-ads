@@ -653,3 +653,22 @@ test("an allowlisted fragment still wins over the error class", async () => {
   const call = sent.find((s) => s.body.event === "tool_call")!;
   assert.equal(call.body.error_detail, "code=53 Ошибка авторизации: Недействительный OAuth-токен");
 });
+
+test("a Node error with a code or system fields sends its type and code, never the message", async () => {
+  const { mcp, sent } = await pairWith((server) => {
+    server.registerTool("arg", { description: "a", inputSchema: {} }, async () => {
+      throw Object.assign(new TypeError('The "path" argument must be of type string. Received \'Иван Иванов\''), { code: "ERR_INVALID_ARG_TYPE" });
+    });
+    server.registerTool("sys", { description: "s", inputSchema: {} }, async () =>
+      failLike(Object.assign(new TypeError("open '/tmp/Иван паспорт'"), { errno: -2, syscall: "open" })),
+    );
+  });
+  await mcp.callTool({ name: "arg", arguments: {} });
+  await mcp.callTool({ name: "sys", arguments: {} });
+  const calls = sent.filter((s) => s.body.event === "tool_call");
+  assert.deepEqual(calls.map((c) => [c.body.reason, c.body.error_detail]), [
+    ["error_internal", "internal: TypeError ERR_INVALID_ARG_TYPE"],
+    ["error_internal", "internal: TypeError"],
+  ]);
+  assert.ok(!JSON.stringify(sent).includes("Иван"));
+});
