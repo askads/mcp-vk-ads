@@ -147,7 +147,7 @@ export function registerAdPlanTools(server: McpServer, client: VkAdsClient): voi
       title: "Изменить кампанию (ad_plan)",
       annotations: WRITE_UPDATE,
       description:
-        "Меняет у кампании название, бюджеты, предельную ставку или даты. Денежные поля — в валюте аккаунта. Для смены статуса — ad_plan_action.",
+        "Меняет у кампании название, бюджеты, предельную ставку или даты. Денежные поля — в валюте аккаунта. Для смены статуса — ad_plan_action. Перед вызовом назвать пользователю объект, текущее значение (из list_*) и новое; менять по одному объекту, чтобы сбой было видно.",
       inputSchema: {
         id: z.number().int().describe("Id изменяемой кампании."),
         name: z.string().min(1).optional().describe("Новое название."),
