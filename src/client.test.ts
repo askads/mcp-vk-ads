@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { VkAdsClient, MAX_PAGE_LIMIT, MAX_AUTO_ITEMS } from "./client.js";
-import { VkAdsError } from "./types.js";
+import { FORBIDDEN_HINT, VkAdsError } from "./types.js";
+import { errorDetail } from "./telemetry.js";
 
 const BASE = "https://ads.vk.com/api";
 
@@ -114,7 +115,7 @@ test("request() keeps the per-field details of a validation_failed error", async
       () => makeClient().post("v2/ad_plans.json", {}),
       (err: unknown) =>
         err instanceof VkAdsError &&
-        /\[validation_failed\] Validation failed/.test(err.message) &&
+        /HTTP 400: validation_failed: Validation failed \{/.test(err.message) &&
         /"ad_groups"/.test(err.message) &&
         /This field is required/.test(err.message),
     );
@@ -147,7 +148,7 @@ test("request() formats an object-style error without details as code + message"
     () => new Response(JSON.stringify({ error: { code: "WRONG_RESOURCE", message: "page not found" } }), { status: 404 }),
   );
   try {
-    await assert.rejects(() => makeClient().get("v2/x.json"), /: HTTP 404: \[WRONG_RESOURCE\] page not found$/);
+    await assert.rejects(() => makeClient().get("v2/x.json"), /: HTTP 404: WRONG_RESOURCE: page not found$/);
   } finally {
     mock.restore();
   }
@@ -169,6 +170,60 @@ test("request() formats an OAuth-style error body", async () => {
   } finally {
     mock.restore();
   }
+});
+
+// Body shapes VK (or the proxy in front of it) answers with. Before, a body that rendered
+// with a leading "[" or "{" reached the beacon as a bare "HTTP 403": errorDetail stops there.
+const ERROR_BODIES: Array<[status: number, body: string, message: RegExp, detail: string]> = [
+  [403, "", /^HTTP 403: \(пустое тело ответа\)\. Нет прав/, "HTTP 403 (пустое тело ответа). Нет прав"],
+  [403, " \n", /^HTTP 403: \(пустое тело ответа\)/, "HTTP 403 (пустое тело ответа)"],
+  [403, "{}", /^HTTP 403: \(пустое тело ответа\)/, "HTTP 403 (пустое тело ответа)"],
+  [
+    403,
+    JSON.stringify({ error: { code: "forbidden", message: "Access denied" } }),
+    /^HTTP 403: forbidden: Access denied\. Нет прав/,
+    "HTTP 403 forbidden: Access denied. Нет прав",
+  ],
+  [
+    400,
+    JSON.stringify({ error: { code: "validation_failed", message: "Validation failed", fields: { status: { code: "read_only", message: "Field is read only" } } } }),
+    /^HTTP 400: validation_failed: Validation failed \{"fields":\{"status"/,
+    "HTTP 400 validation_failed: Validation failed; message=Field is read only",
+  ],
+  [404, JSON.stringify({ error: { code: "not_found" } }), /^HTTP 404: not_found$/, "HTTP 404 not_found"],
+  [400, JSON.stringify({ name: ["This field is required."] }), /^HTTP 400: name: This field is required\.$/, "HTTP 400 name: This field is required"],
+  [400, JSON.stringify(["Unknown field"]), /^HTTP 400: Unknown field$/, "HTTP 400 Unknown field"],
+  [405, JSON.stringify({ detail: "Method not allowed." }), /^HTTP 405: detail: Method not allowed\.$/, "HTTP 405 detail: Method not allowed"],
+  [
+    405,
+    "<html>\n<head><title>405 Not Allowed</title></head>\n<body><center><h1>405 Not Allowed</h1></center><hr><center>nginx</center></body>\n</html>",
+    /^HTTP 405: 405 Not Allowed \(HTML-страница вместо ответа API\)$/,
+    "HTTP 405 405 Not Allowed (HTML-страница вместо ответа API)",
+  ],
+  [404, "Not found", /^HTTP 404: Not found$/, "HTTP 404 Not found"],
+];
+
+test("request() puts every error body shape into the message and the telemetry excerpt", async () => {
+  for (const [status, body, message, detail] of ERROR_BODIES) {
+    const mock = mockFetch(() => new Response(body, { status }));
+    try {
+      const err = await makeClient({ maxRetries: 0 })
+        .get("v2/ad_plans.json")
+        .then(() => assert.fail("expected a rejection"), (e: unknown) => e);
+      assert.ok(err instanceof VkAdsError, body);
+      assert.match(err.message, message, body);
+      assert.ok(errorDetail(`Ошибка: ${err.message}`).startsWith(detail), `${body} → ${errorDetail(`Ошибка: ${err.message}`)}`);
+    } finally {
+      mock.restore();
+    }
+  }
+});
+
+test("only a 403 carries the grant hint, after VK's own text and request id", () => {
+  const forbidden = new VkAdsError(403, { error: { code: "forbidden", message: "Forbidden" } }, "05b0e8b7");
+  assert.ok(forbidden.message.endsWith(`(request_id 05b0e8b7). ${FORBIDDEN_HINT}`));
+  assert.match(FORBIDDEN_HINT, /agency_client_credentials/);
+  assert.ok(!new VkAdsError(404, "Not found").message.includes(FORBIDDEN_HINT));
 });
 
 test("getAll() pages at MAX_PAGE_LIMIT, merges items and carries `total`", async () => {
