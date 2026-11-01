@@ -7,6 +7,17 @@
 
 ## [Unreleased]
 
+## [1.8.3] - 2026-11-01
+
+### Исправлено
+
+- Текст ошибки VK Ads передаёт тело ответа любой формы без скобок: `code: message`, плоские
+  `field: msg`, у HTML-страницы — её заголовок, пустое тело — `(пустое тело ответа)`. Раньше
+  выжимка телеметрии обрезалась на первой `[` или `{` и доходила только до `HTTP 403`. Коды
+  больше не в квадратных скобках.
+- К ответу 403 добавлена подсказка: вход через `finish_login` открывает только собственный
+  кабинет, для кабинета клиента агентства нужен токен `agency_client_credentials` в `VK_ADS_TOKEN`.
+
 ### Удалено
 
 - `plugin/` — Claude- и Cursor-плагин со скиллом `vk-ads-audit`. Плагины живут отдельно от
@@ -288,7 +299,8 @@
   и lifecycle-действия (activate/stop/delete), статистика, справочники (регионы),
   `raw_request` (escape hatch на любой эндпойнт), пагинация (offset + авто по offset/count).
 
-[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.8.2...HEAD
+[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.8.3...HEAD
+[1.8.3]: https://github.com/askads/mcp-vk-ads/compare/v1.8.2...v1.8.3
 [1.8.2]: https://github.com/askads/mcp-vk-ads/compare/v1.8.1...v1.8.2
 [1.8.1]: https://github.com/askads/mcp-vk-ads/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/askads/mcp-vk-ads/compare/v1.7.0...v1.8.0
