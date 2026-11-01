@@ -5,6 +5,14 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
 проект придерживается [семантического версионирования](https://semver.org/lang/ru/).
 
+## [Unreleased]
+
+### Удалено
+
+- `plugin/` — Claude- и Cursor-плагин со скиллом `vk-ads-audit`. Плагины живут отдельно от
+  MCP-сервера (маркетплейс `askads/claude-plugins`), а этот был закреплён на точной версии
+  npm-пакета и обновлялся вручную с каждым релизом.
+
 ## [1.8.2] - 2026-10-31
 
 ### Fixed
@@ -280,7 +288,7 @@
   и lifecycle-действия (activate/stop/delete), статистика, справочники (регионы),
   `raw_request` (escape hatch на любой эндпойнт), пагинация (offset + авто по offset/count).
 
-[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.8.1...HEAD
+[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.8.2...HEAD
 [1.8.2]: https://github.com/askads/mcp-vk-ads/compare/v1.8.1...v1.8.2
 [1.8.1]: https://github.com/askads/mcp-vk-ads/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/askads/mcp-vk-ads/compare/v1.7.0...v1.8.0
