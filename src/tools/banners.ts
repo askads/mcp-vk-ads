@@ -108,7 +108,7 @@ export function registerBannerTools(server: McpServer, client: VkAdsClient): voi
       title: "Изменить объявление (banner)",
       annotations: WRITE_UPDATE,
       description:
-        "Меняет у объявления название, текстовые блоки или ссылки. Для смены статуса — banner_action. Структуры отправляются как есть. Перед вызовом назвать пользователю объект, текущее значение (из list_*) и новое; менять по одному объекту, чтобы сбой было видно.",
+        "Меняет у объявления название, текстовые блоки или ссылки. Для смены статуса — banner_action. Структуры отправляются как есть.",
       inputSchema: {
         id: z.number().int().describe("Id изменяемого объявления."),
         name: z.string().min(1).optional().describe("Новое название."),

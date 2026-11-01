@@ -18,7 +18,7 @@ export function registerAccountTools(server: McpServer, client: VkAdsClient): vo
       annotations: READ_ONLY,
       description:
         "Возвращает информацию о текущем аккаунте VK Рекламы (user.json), включая additional_info.client_name. Позволяет убедиться, на какой аккаунт рекламодателя указывает токен. " +
-          "Вызывать перед первым отчётом и при пустом или чужом списке кампаний: токен агентства (client_credentials) видит объекты самого агентства, а не клиента — кабинет клиента требует токена гранта agency_client_credentials в VK_ADS_TOKEN.",
+          "Токен гранта client_credentials агентского аккаунта видит объекты самого агентства, а не его клиентов: кабинет клиента открывает только токен гранта agency_client_credentials в VK_ADS_TOKEN.",
       inputSchema: {
         fields: z
           .array(z.string())
