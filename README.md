@@ -26,6 +26,16 @@
 
 <img src="docs/demo.gif" alt="Демонстрация: ассистент сопоставляет кампании, статистику и баланс VK Рекламы" width="1000">
 
+## Видео: подключение за минуту
+
+Клик по превью открывает видео со звуком. Данные в роликах демонстрационные.
+
+| Claude Code | Codex |
+|---|---|
+| [![Подключение в Claude Code](https://share.gistrec.cloud/askads-mcp/terminal-vk-ads-claude.gif)](https://share.gistrec.cloud/askads-mcp/terminal-vk-ads-claude.mp4) | [![Подключение в Codex](https://share.gistrec.cloud/askads-mcp/terminal-vk-ads-codex.gif)](https://share.gistrec.cloud/askads-mcp/terminal-vk-ads-codex.mp4) |
+
+Все видео на одной странице: [share.gistrec.cloud/askads-mcp](https://share.gistrec.cloud/askads-mcp/index.html).
+
 ## Содержание
 
 - [Быстрый старт](#быстрый-старт)
