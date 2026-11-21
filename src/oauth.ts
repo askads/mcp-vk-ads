@@ -14,8 +14,13 @@
 /** API root used when the caller passes none (same host as the REST API). */
 export const DEFAULT_API_BASE = "https://ads.vk.com/api";
 
-/** Cabinet page where the user creates the API app and reads client_id/client_secret. */
-export const API_SETTINGS_URL = "https://ads.vk.com/hq/settings/access";
+/**
+ * Cabinet page with the «Доступ к API» block: the user requests API access there and
+ * reads client_id/client_secret. The cabinet lives on ads.vk.ru (ads.vk.com 301s to it),
+ * and the block sits on the general settings page — `/hq/settings/access` is the OAuth
+ * consent page of the authorization_code flow, not the place where the keys are.
+ */
+export const API_SETTINGS_URL = "https://ads.vk.ru/hq/settings";
 
 /** VK Ads keeps at most this many live tokens per (client_id, user) pair. */
 export const MAX_ACTIVE_TOKENS = 5;
@@ -154,9 +159,9 @@ function describeOAuthError(status: number, body: unknown): string {
     case "invalid_client":
       return (
         "VK Реклама не приняла пару client_id/client_secret (invalid_client). " +
-        "Проверьте, что обе строки скопированы целиком и относятся к одному приложению " +
-        `в разделе «Настройки → Доступ к API» (${API_SETTINGS_URL}); ` +
-        "то же самое возвращается, если приложение заблокировано." +
+        "Проверьте, что обе строки скопированы целиком и взяты из одного кабинета — " +
+        `блок «Доступ к API» в разделе «Настройки → Общие» (${API_SETTINGS_URL}); ` +
+        "то же самое возвращается, если доступ к API заблокирован." +
         tail
       );
     case "invalid_grant":

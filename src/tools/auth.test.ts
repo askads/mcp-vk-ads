@@ -61,7 +61,7 @@ test("start_login returns the cabinet instructions without touching the network"
     const body = payload(result);
 
     assert.equal(result.isError, undefined);
-    assert.match(String(body.settingsUrl), /ads\.vk\.com/);
+    assert.match(String(body.settingsUrl), /^https:\/\/ads\.vk\.ru\/hq\/settings$/);
     assert.deepEqual(body.expectedInputs, ["clientId", "clientSecret"]);
     assert.match(String(body.warning), /client_secret/);
   });
