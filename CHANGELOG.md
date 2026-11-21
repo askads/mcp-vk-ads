@@ -7,6 +7,8 @@
 
 ## [Unreleased]
 
+## [1.8.4] - 2026-11-21
+
 ### Исправлено
 
 - Инструкция `start_login` описывала несуществующий порядок действий. Ссылка вела на
@@ -309,7 +311,8 @@
   и lifecycle-действия (activate/stop/delete), статистика, справочники (регионы),
   `raw_request` (escape hatch на любой эндпойнт), пагинация (offset + авто по offset/count).
 
-[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.8.3...HEAD
+[Unreleased]: https://github.com/askads/mcp-vk-ads/compare/v1.8.4...HEAD
+[1.8.4]: https://github.com/askads/mcp-vk-ads/compare/v1.8.3...v1.8.4
 [1.8.3]: https://github.com/askads/mcp-vk-ads/compare/v1.8.2...v1.8.3
 [1.8.2]: https://github.com/askads/mcp-vk-ads/compare/v1.8.1...v1.8.2
 [1.8.1]: https://github.com/askads/mcp-vk-ads/compare/v1.8.0...v1.8.1
