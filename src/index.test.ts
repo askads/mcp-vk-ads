@@ -121,7 +121,7 @@ test("start_login explains where the client_id/client_secret come from", async (
       settingsUrl?: string;
       steps?: string[];
     };
-    assert.match(body.settingsUrl ?? "", /^https:\/\/ads\.vk\.com\//);
+    assert.match(body.settingsUrl ?? "", /^https:\/\/ads\.vk\.ru\//);
     assert.ok((body.steps ?? []).length >= 2, "the user needs the whole path, not just a link");
   } finally {
     await client.close();

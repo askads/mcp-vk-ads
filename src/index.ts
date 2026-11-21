@@ -58,8 +58,8 @@ export const INSTRUCTIONS =
 const UNCONFIGURED_PREFIX =
   "ВНИМАНИЕ: VK Реклама ещё не подключена — токена нет, поэтому любой инструмент данных вернёт " +
   "ошибку. Подключение делается прямо в диалоге и без перезапуска клиента: вызовите start_login, " +
-  "покажите пользователю инструкцию, попросите создать приложение в кабинете (Настройки → Доступ " +
-  "к API) и прислать client_id и client_secret, затем передайте их в finish_login. ";
+  "покажите пользователю инструкцию, попросите взять в кабинете (Настройки → Общие → " +
+  "Доступ к API) и прислать client_id и client_secret, затем передайте их в finish_login. ";
 
 /**
  * Loads the config without dying on a bad value. A server that exits here never
