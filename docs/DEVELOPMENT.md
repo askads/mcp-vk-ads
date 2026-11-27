@@ -26,6 +26,19 @@ npm run typecheck  # проверка типов: исходники + тест�
 }
 ```
 
+## Ручной токен для `VK_ADS_TOKEN`
+
+Для CI и установок без диалога токен можно выпустить вручную:
+
+```bash
+curl -X POST https://ads.vk.com/api/v2/oauth2/token.json \
+  -d grant_type=client_credentials \
+  -d client_id=ВАШ_CLIENT_ID \
+  -d client_secret=ВАШ_CLIENT_SECRET
+```
+
+Из ответа возьмите `access_token`. Он живёт около суток и сам не продлевается: при `invalid_token` выпустите новый. У одного пользователя не больше 5 активных токенов на приложение; старые отзываются запросом `POST /api/v2/oauth2/token/delete.json` — он удаляет **все** токены этого пользователя для данного `client_id`.
+
 ## Smoke-проверка (вживую, только чтение)
 
 `npm run smoke` делает несколько **read-only** вызовов к кабинету из окружения
